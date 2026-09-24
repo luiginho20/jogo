@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Speedanglo - Ranking & Temas</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        /* TEMA NOTURNO (PADRÃO) */
+        :root {
+            --bg-color: #0f172a; --panel-bg: #1e293b; --text-color: #f8fafc; --subtitle-color: #94a3b8;
+            --primary: #3b82f6; --primary-glow: 0 0 15px rgba(59, 130, 246, 0.6);
+            --correct: #22c55e; --wrong: #ef4444; --purple: #a855f7; --purple-glow: 0 0 15px rgba(168, 85, 247, 0.6);
+            --orange: #f97316; --orange-glow: 0 0 15px rgba(249, 115, 22, 0.6);
+            --gold: #eab308; --silver: #cbd5e1; --bronze: #cd7f32;
+            
+            --border-color: rgba(255,255,255,0.1); --header-bg: rgba(30, 41, 59, 0.7); --card-bg: rgba(30, 41, 59, 0.85);
+            --hover-bg: rgba(59, 130, 246, 0.25); --key-del-bg: rgba(239, 68, 68, 0.2); --key-enter-bg: rgba(34, 197, 94, 0.2);
+            --tab-bg: rgba(30, 41, 59, 0.5); --gold-bg: rgba(234, 179, 8, 0.1);
+            --silver-bg: rgba(203, 213, 225, 0.05); --bronze-bg: rgba(205, 127, 50, 0.05); --shadow-base: rgba(0,0,0,0.5);
+        }
+
+        /* TEMA CLARO */
+        body.light-mode {
+            --bg-color: #e6e1d6; --panel-bg: #f5f1e9; --text-color: #2c2c24; --subtitle-color: #6b665c;
+            --primary: #4a5d23; --primary-glow: 0 0 15px rgba(74, 93, 35, 0.4);
+            --correct: #2e7d32; --wrong: #c62828; --purple: #6a4c93; --purple-glow: 0 0 15px rgba(106, 76, 147, 0.4);
+            --orange: #d97706; --orange-glow: 0 0 15px rgba(217, 119, 6, 0.4);
+            --gold: #b8860b; --silver: #555555; --bronze: #8b4513;
+            
+            --border-color: rgba(0,0,0,0.18); --header-bg: rgba(245, 241, 233, 0.9); --card-bg: #f5f1e9;
+            --hover-bg: rgba(74, 93, 35, 0.15); --key-del-bg: rgba(198, 40, 40, 0.12); --key-enter-bg: rgba(46, 125, 50, 0.12);
+            --tab-bg: rgba(230, 225, 214, 0.8); --gold-bg: rgba(184, 134, 11, 0.1);
+            --silver-bg: rgba(85, 85, 85, 0.08); --bronze-bg: rgba(139, 69, 19, 0.08); --shadow-base: rgba(0,0,0,0.15);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: background-color 0.3s, border-color 0.3s, color 0.3s; }
+        body { background-color: var(--bg-color); color: var(--text-color); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; position: relative; }
+        #canvas-particles { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none !important; z-index: 1; }
+
+        .theme-toggle { position: fixed; top: 20px; right: 20px; background: var(--panel-bg); border: 2px solid var(--border-color); color: var(--text-color); font-size: 1.3rem; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; z-index: 100; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px var(--shadow-base); transition: all 0.3s; }
+        .theme-toggle:hover { transform: scale(1.1); border-color: var(--primary); box-shadow: var(--primary-glow); }
+        .music-toggle { right: 75px; } .music-toggle.muted { color: var(--wrong); border-color: var(--wrong); }
+
+        .close-btn { position: fixed; top: 20px; left: 20px; background: var(--panel-bg); border: 2px solid var(--border-color); color: var(--wrong); font-size: 1.2rem; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; z-index: 100; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px var(--shadow-base); transition: all 0.3s; font-weight: bold; }
+        .close-btn:hover { transform: scale(1.1); border-color: var(--wrong); box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); }
+
+        .screen { display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; max-width: 520px; height: 100%; padding: 20px; z-index: 10; position: relative; overflow-y: auto; }
+        .active-screen { display: flex; }
+
+        h1 { font-size: 2.5rem; text-align: center; margin-bottom: 5px; color: var(--primary); text-shadow: var(--primary-glow); letter-spacing: 2px; }
+        .subtitle { color: var(--subtitle-color); margin-bottom: 20px; text-align: center; font-size: 0.95rem; }
+
+        .btn { background-color: var(--panel-bg); color: var(--text-color); border: 2px solid var(--primary); padding: 12px 20px; font-size: 1.05rem; border-radius: 12px; cursor: pointer; width: 100%; max-width: 340px; margin-bottom: 10px; box-shadow: 0 4px 6px var(--shadow-base); font-weight: bold; text-transform: uppercase; letter-spacing: 1px; text-align: center; position: relative; z-index: 20; }
+        .btn:hover, .btn:active { background-color: var(--primary); color: #ffffff; box-shadow: var(--primary-glow); transform: translateY(-2px); }
+        .btn-purple { border-color: var(--purple); } .btn-purple:hover { background-color: var(--purple); box-shadow: var(--purple-glow); }
+        .btn-orange { border-color: var(--orange); } .btn-orange:hover { background-color: var(--orange); box-shadow: var(--orange-glow); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .hack-indicator { display: none; background: rgba(34, 197, 94, 0.2); color: var(--correct); font-weight: bold; font-size: 0.8rem; text-align: center; border: 1px dashed var(--correct); padding: 4px; border-radius: 6px; width: 100%; margin-bottom: 5px; animation: pulse 1s infinite; }
+        .btn-cheat { background-color: rgba(34, 197, 94, 0.15) !important; color: var(--correct) !important; border: 2px solid var(--correct) !important; width: 100%; max-width: 320px; margin-top: 10px; font-weight: bold; font-size: 1.1rem; padding: 12px; border-radius: 10px; cursor: pointer; display: none; box-shadow: 0 0 10px rgba(34, 197, 94, 0.4); }
+        .btn-cheat:hover { background-color: var(--correct) !important; color: #fff !important; }
+
+        .game-header { display: flex; justify-content: space-between; align-items: center; width: 100%; font-size: 0.9rem; font-weight: bold; margin-bottom: 5px; background: var(--header-bg); padding: 12px 15px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 4px 10px var(--shadow-base); margin-top: 15px;}
+        .timer-container { flex-grow: 1; height: 12px; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 6px; margin: 0 10px; overflow: hidden; position: relative; }
+        .timer-bar { height: 100%; width: 100%; background: var(--primary); border-radius: 4px; transition: width 0.1s linear, background-color 0.3s; }
+        .timer-bar.danger { background: var(--wrong); box-shadow: 0 0 10px var(--wrong); animation: pulse-bar 0.5s infinite; }
+
+        .level-badge { color: var(--gold); min-width: 65px; }
+        .score { color: var(--correct); min-width: 65px; text-align: right; }
+        .streak-badge { display: none; color: var(--orange); font-size: 0.8rem; text-align: center; width: 100%; margin-top: -5px; margin-bottom: 5px; animation: pulse 1s infinite; font-weight: bold; }
+        
+        .target-badge { display: none; width: 100%; text-align: center; background: rgba(59, 130, 246, 0.1); border: 1px solid var(--primary); color: var(--primary); font-size: 0.8rem; font-weight: bold; padding: 4px; border-radius: 6px; margin-bottom: 10px; }
+
+        .question-card { background-color: var(--card-bg); border-radius: 20px; width: 100%; padding: 25px 15px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 10px 25px var(--shadow-base); border: 1px solid var(--border-color); position: relative; margin-bottom: 15px; }
+        .question { font-size: 2.1rem; font-weight: bold; margin-bottom: 10px; text-align: center; letter-spacing: 1px; }
+        .input-display { font-size: 2.2rem; color: var(--primary); text-shadow: var(--primary-glow); min-height: 45px; min-width: 120px; text-align: center; border-bottom: 3px solid var(--primary); }
+
+        .options-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; max-width: 380px; }
+        .option-btn { background: var(--panel-bg); border: 2px solid var(--border-color); color: var(--text-color); padding: 15px 10px; font-size: 1.25rem; font-weight: bold; border-radius: 12px; cursor: pointer; }
+        .option-btn:hover { border-color: var(--primary); background: var(--hover-bg); transform: translateY(-2px); }
+
+        .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; max-width: 320px; }
+        .key { background-color: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-color); font-size: 1.4rem; padding: 12px 0; display: flex; justify-content: center; align-items: center; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px var(--shadow-base); }
+        .key-action { background-color: var(--key-del-bg); color: var(--wrong); font-size: 0.9rem; }
+        .key-enter { background-color: var(--key-enter-bg); color: var(--correct); grid-column: span 2; }
+
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 380px; margin-bottom: 15px; }
+        .stat-box { background: var(--panel-bg); padding: 12px 10px; border-radius: 10px; text-align: center; border: 1px solid var(--border-color); box-shadow: 0 2px 5px var(--shadow-base); }
+        .stat-label { font-size: 0.72rem; color: var(--subtitle-color); text-transform: uppercase; margin-bottom: 3px; }
+        .stat-value { font-size: 1.25rem; font-weight: bold; color: var(--primary); }
+
+        .name-input { width: 100%; padding: 12px; border-radius: 8px; border: 2px solid var(--primary); background: var(--bg-color); color: var(--text-color); font-size: 1.1rem; text-align: center; margin-bottom: 10px; outline: none; }
+        .name-input:focus { box-shadow: var(--primary-glow); }
+
+        .ranking-container { width: 100%; max-width: 380px; background: var(--panel-bg); border-radius: 10px; padding: 5px; border: 1px solid var(--border-color); margin-bottom: 15px; min-height: 250px; max-height: 350px; overflow-y: auto; box-shadow: 0 4px 10px var(--shadow-base); }
+        .ranking-item { display: flex; justify-content: space-between; padding: 12px 15px; border-bottom: 1px solid var(--border-color); align-items: center; }
+        .ranking-item:last-child { border-bottom: none; }
+        .rank-pos { font-weight: bold; width: 30px; text-align: center;}
+        .rank-name { flex-grow: 1; text-align: left; padding-left: 10px; font-weight: 500; }
+        .rank-lvl { font-weight: bold; color: var(--primary); }
+
+        .rank-1 { color: var(--gold); background: var(--gold-bg); border-radius: 8px; } .rank-1 .rank-lvl { color: var(--gold); }
+        .rank-2 { color: var(--silver); background: var(--silver-bg); border-radius: 8px; } .rank-2 .rank-lvl { color: var(--silver); }
+        .rank-3 { color: var(--bronze); background: var(--bronze-bg); border-radius: 8px; } .rank-3 .rank-lvl { color: var(--bronze); }
+
+        .tabs { display: flex; width: 100%; max-width: 380px; gap: 5px; margin-bottom: 10px; }
+        .tab-btn { flex: 1; padding: 8px 5px; background: var(--tab-bg); border: 1px solid var(--border-color); color: var(--subtitle-color); font-weight: bold; border-radius: 8px; cursor: pointer; font-size: 0.85rem; }
+        .tab-btn.active { background: var(--primary); color: #ffffff; border-color: var(--primary); }
+        .tab-btn-orange.active { background: var(--orange); border-color: var(--orange); }
+        .loading-text { text-align: center; padding: 30px; color: var(--primary); font-weight: bold; animation: pulse 1s infinite; }
+
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        @keyframes pulse-bar { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .correct-flash { border-color: var(--correct); }
+        .wrong-flash { border-color: var(--wrong); }
+    </style>
+</head>
+<body>
+    <canvas id="canvas-particles"></canvas>
+    <button id="theme-toggle-btn" class="theme-toggle" onclick="toggleTheme()">☀️</button>
+    <button id="music-toggle-btn" class="theme-toggle music-toggle" onclick="toggleMusic(); this.blur();" title="Silenciar música (tecla M)">🎵</button>
+
+    <!-- MENU -->
+    <div id="menu-screen" class="screen active-screen">
+        <h1>SPEEDANGLO</h1>
+        <p class="subtitle">Escolha seu modo de jogo</p>
+        <button class="btn" onclick="startMode('teclado')">⌨ TECLADO (SOBREVIVÊNCIA)</button>
+        <button class="btn btn-purple" onclick="startMode('multipla')">🎯 MÚLTIPLA ESCOLHA</button>
+        <button class="btn btn-orange" onclick="startMode('60s')">⏱ 60 SEGUNDOS (MAX SCORE)</button>
+        <button class="btn" style="background: transparent; border-color: var(--subtitle-color);" onclick="openRankingScreen()">🏆 RANKING GLOBAL</button>
+    </div>
+
+    <!-- JOGO -->
+    <div id="game-screen" class="screen">
+        <button class="close-btn" onclick="abortGame()" title="Sair para o Menu">✖</button>
+        
+        <div id="hack-banner" class="hack-indicator">⚠️ MODO CHEAT ATIVO ⚠️</div>
+        <div id="streak-display" class="streak-badge">🔥 STREAK BÔNUS ATIVO 🔥</div>
+        
+        <div class="game-header">
+            <div id="level-display" class="level-badge">🚩 LVL 1</div>
+            <div class="timer-container"><div id="timer-bar" class="timer-bar"></div></div>
+            <div id="score-display" class="score">⭐ 0</div>
+        </div>
+        
+        <div id="target-display" class="target-badge"></div>
+
+        <div id="question-card" class="question-card">
+            <div id="question-display" class="question">12 + 15</div>
+            <div id="input-display" class="input-display"></div>
+        </div>
+
+        <div id="options-container" class="options-grid" style="display: none;"></div>
+
+        <div id="keypad-container" class="keypad">
+            <div class="key" onclick="inputChar('1')">1</div><div class="key" onclick="inputChar('2')">2</div><div class="key" onclick="inputChar('3')">3</div>
+            <div class="key" onclick="inputChar('4')">4</div><div class="key" onclick="inputChar('5')">5</div><div class="key" onclick="inputChar('6')">6</div>
+            <div class="key" onclick="inputChar('7')">7</div><div class="key" onclick="inputChar('8')">8</div><div class="key" onclick="inputChar('9')">9</div>
+            <div class="key" onclick="inputChar(',')">,</div><div class="key" onclick="inputChar('0')">0</div>
+            <div class="key key-action" onclick="inputDel()">DEL</div>
+            <div class="key key-action key-enter" onclick="submitAnswer()">ENTER</div>
+        </div>
+
+        <button id="btn-cheat-auto" class="btn-cheat" onclick="autoSolve()">⚡ AUTO-ACERTAR</button>
+    </div>
+
+    <!-- FIM DE JOGO -->
+    <div id="game-over-screen" class="screen">
+        <h1 style="color: var(--wrong);">FIM DE JOGO</h1>
+        <div class="stats-grid">
+            <div class="stat-box"><div id="label-final-level" class="stat-label">SEU LEVEL</div><div id="final-level" class="stat-value" style="color: var(--gold)">1</div></div>
+            <div class="stat-box"><div class="stat-label">PONTUAÇÃO</div><div id="final-score" class="stat-value">0</div></div>
+            <div class="stat-box" style="grid-column: span 2;"><div class="stat-label">A CONTA ERA</div><div id="final-equation" class="stat-value" style="font-size: 1.4rem; color: var(--purple);">? + ? = ?</div></div>
+        </div>
+
+        <div id="ranking-input-section" style="display: none; width: 100%; max-width: 380px; margin-bottom: 15px; background: var(--gold-bg); padding: 15px; border-radius: 10px; border: 1px solid var(--gold);">
+            <h3 style="color: var(--gold); margin-bottom: 10px; font-size: 1.1rem; text-align: center;">🎉 VOCÊ ENTROU PRO RANKING!</h3>
+            <p style="font-size: 0.85rem; text-align: center; margin-bottom: 10px; color: var(--subtitle-color);">Salve seu nome e eternize seu placar!</p>
+            <input type="text" id="player-name" class="name-input" placeholder="Digite seu nome (Máx 12)" maxlength="12" autocomplete="off">
+            <button id="btn-save-ranking" class="btn" style="border-color: var(--gold); color: var(--gold); width: 100%;" onclick="submitRankingName()">SALVAR NO RANKING</button>
+            <p id="ranking-msg" style="font-size: 0.8rem; text-align: center; margin-top: 5px; color: var(--primary); display: none;"></p>
+        </div>
+
+        <button class="btn" onclick="startMode(state.currentMode)">JOGAR NOVAMENTE</button>
+        <button class="btn" style="background: transparent; border-color: var(--subtitle-color); color: var(--text-color)" onclick="showScreen('menu-screen')">MENU PRINCIPAL</button>
+    </div>
+
+    <!-- RANKING -->
+    <div id="records-screen" class="screen">
+        <h1>🏆 RANKING</h1>
+        <div class="tabs">
+            <button id="tab-teclado" class="tab-btn active" onclick="openRankingScreen('teclado')">⌨ TECLADO</button>
+            <button id="tab-multipla" class="tab-btn" onclick="openRankingScreen('multipla')">🎯 MÚLTIPLA</button>
+            <button id="tab-60s" class="tab-btn tab-btn-orange" onclick="openRankingScreen('60s')">⏱ 60s SCORE</button>
+        </div>
+        <div id="ranking-list" class="ranking-container"></div>
+        <button class="btn" onclick="showScreen('menu-screen')">VOLTAR</button>
+    </div>
+
+    <script>
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            document.getElementById('theme-toggle-btn').textContent = isLight ? '🌙' : '☀️';
+            localStorage.setItem('speedangloTheme', isLight ? 'light' : 'dark');
+        }
+
+        const SUPABASE_URL = 'https://tkklsjyijbcrteuzsous.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRra2xzanlpamJjcnRldXpzb3VzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1OTkwOTIsImV4cCI6MjEwNTE3NTA5Mn0.qx84l6IpgUURpNX2CnZzrnDEjlpc8ezKpTp_-eavS88';
+        let supabaseClient = null;
+
+        function getSupabase() {
+            if (supabaseClient) return supabaseClient;
+            try {
+                if (window.supabase) { supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); return supabaseClient; }
+            } catch (err) {}
+            return null;
+        }
+
+        let localRecords = { rankingTeclado: [], rankingMultipla: [], ranking60s: [] };
+        let state = { 
+            isPlaying: false, currentMode: 'teclado', level: 1, score: 0, 
+            questionTime: 15, totalTimerLimit: 15, currentQuestion: null, currentInput: "", 
+            lastFrameTime: 0, animationReq: null, streak: 0, questionStartTime: 0,
+            cheatMode: false, typedKeysBuffer: "", currentLeaderboard: [] 
+        };
+
+        const AudioSys = {
+            ctx: null,
+            init() { if (!this.ctx) { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } if (this.ctx.state === 'suspended') this.ctx.resume(); },
+            playTone(freq, type, duration, vol = 0.15) { this.init(); try { const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain(); osc.type = type; osc.frequency.setValueAtTime(freq, this.ctx.currentTime); gain.gain.setValueAtTime(vol, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration); osc.connect(gain); gain.connect(this.ctx.destination); osc.start(); osc.stop(this.ctx.currentTime + duration); } catch(e){} },
+            correct() { this.playTone(880, 'sine', 0.1); setTimeout(() => this.playTone(1320, 'sine', 0.15), 70); },
+            wrong() { this.playTone(150, 'sawtooth', 0.25, 0.2); },
+            record() { this.playTone(523, 'triangle', 0.1); setTimeout(() => this.playTone(659, 'triangle', 0.1), 100); setTimeout(() => this.playTone(784, 'triangle', 0.2), 200); },
+            gameOver() { this.playTone(200, 'sawtooth', 0.5); }
+        };
+        window.addEventListener('pointerdown', () => AudioSys.init(), { once: true });
+
+        const MusicSys = {
+            BPM: 124, VOLUME: 0.42, muted: false, playing: false, comp: null, bus: null, noise: null,
+            timer: null, nextTime: 0, step: 0, intensity: 0, target: 0,
+            CHORDS: [ { bass: 45, tones: [57, 60, 64] }, { bass: 41, tones: [57, 60, 65] }, { bass: 48, tones: [55, 60, 64] }, { bass: 43, tones: [55, 59, 62] }, { bass: 45, tones: [57, 60, 64] }, { bass: 41, tones: [57, 60, 65] }, { bass: 43, tones: [55, 59, 62] }, { bass: 40, tones: [56, 59, 62] } ],
+            BASS_PATTERN: [0, 0, 12, 0, 0, 12, 0, 7],
+            LEAD: [ [[0,76,3],[3,72,3],[6,76,2],[8,81,4],[12,79,2],[14,76,2]], [[0,77,3],[3,72,3],[6,77,2],[8,81,4],[12,77,2],[14,74,2]], [[0,76,3],[3,79,3],[6,76,2],[8,72,4],[12,76,2],[14,79,2]], [[0,74,3],[3,79,3],[6,74,2],[8,71,4],[12,74,2],[14,79,2]], [[0,81,3],[3,76,3],[6,81,2],[8,79,4],[12,76,2],[14,72,2]], [[0,81,3],[3,77,3],[6,81,2],[8,77,4],[12,74,2],[14,72,2]], [[0,79,3],[3,74,3],[6,79,2],[8,83,4],[12,79,2],[14,74,2]], [[0,80,3],[3,76,3],[6,80,2],[8,83,4],[12,80,2],[14,74,2]] ],
+            mtof(n) { return 440 * Math.pow(2, (n - 69) / 12); },
+            voice(type, freq, t, dur, vol, cutoff, atk, rel) { const ctx = AudioSys.ctx; const osc = ctx.createOscillator(); const g = ctx.createGain(); osc.type = type; osc.frequency.setValueAtTime(freq, t); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + atk); g.gain.setValueAtTime(vol, t + Math.max(atk, dur - rel)); g.gain.linearRampToValueAtTime(0.0001, t + dur); if (cutoff) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cutoff; osc.connect(f); f.connect(g); } else { osc.connect(g); } g.connect(this.bus); osc.start(t); osc.stop(t + dur + 0.02); },
+            noiseHit(t, dur, vol, highpass) { const ctx = AudioSys.ctx; const src = ctx.createBufferSource(); src.buffer = this.noise; const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = highpass; const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); src.connect(f); f.connect(g); g.connect(this.bus); src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02); },
+            kick(t, vol) { const ctx = AudioSys.ctx; const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.11); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2); o.connect(g); g.connect(this.bus); o.start(t); o.stop(t + 0.22); },
+            snare(t, vol) { this.noiseHit(t, 0.15, vol, 1400); this.voice('triangle', 185, t, 0.09, vol * 0.6, 0, 0.001, 0.07); },
+            hat(t, vol) { this.noiseHit(t, 0.04, vol, 7000); },
+            playStep(s, t) { const bar = Math.floor(s / 16), i = s % 16; if (i === 0) this.intensity = this.target; if (this.muted) return; const sd = 60 / this.BPM / 4; const lv = this.intensity; const chord = this.CHORDS[bar]; if (lv === 0 ? (i === 0 || i === 8) : (i % 4 === 0)) this.kick(t, i % 8 === 0 ? 0.9 : 0.7); if (lv >= 1) { if (i === 4 || i === 12) this.snare(t, 0.3); if ((bar === 3 || bar === 7) && (i === 14 || i === 15)) this.snare(t, 0.16); } if (i % 4 === 2) this.hat(t, 0.075); else if (lv >= 2 && i % 2 === 1) this.hat(t, 0.03); if (i % 2 === 0) { this.voice('sawtooth', this.mtof(chord.bass + this.BASS_PATTERN[i / 2]), t, sd * 1.8, 0.2, 650, 0.008, 0.06); } if (i === 0) { chord.tones.forEach(n => this.voice('triangle', this.mtof(n), t, sd * 16 + 0.15, 0.05, 1800, 0.08, 0.3)); } if (lv >= 1) { const n = chord.tones[[0, 1, 2, 1][i % 4]] + 12; const v = (lv >= 2 ? 0.026 : 0.038) * (i % 4 === 0 ? 1.3 : 1); this.voice('square', this.mtof(n), t, sd * 0.8, v, 2400, 0.004, 0.04); } if (lv >= 2) { this.LEAD[bar].forEach(([st, n, len]) => { if (st === i) this.voice('square', this.mtof(n), t, sd * len * 0.92, 0.05, 3200, 0.01, 0.06); }); } },
+            setup() { const ctx = AudioSys.ctx; if (!this.comp) { this.comp = ctx.createDynamicsCompressor(); this.comp.threshold.value = -16; this.comp.ratio.value = 4; this.comp.attack.value = 0.005; this.comp.release.value = 0.15; this.comp.connect(ctx.destination); const len = ctx.sampleRate; this.noise = ctx.createBuffer(1, len, ctx.sampleRate); const d = this.noise.getChannelData(0); for (let k = 0; k < len; k++) d[k] = Math.random() * 2 - 1; } this.bus = ctx.createGain(); this.bus.gain.value = this.muted ? 0 : this.VOLUME; this.bus.connect(this.comp); },
+            start() { if (this.playing) return; try { AudioSys.init(); this.setup(); } catch (e) { return; } this.playing = true; this.step = 0; this.intensity = 0; this.target = 0; this.nextTime = AudioSys.ctx.currentTime + 0.08; clearInterval(this.timer); this.timer = setInterval(() => this.tick(), 25); this.tick(); },
+            tick() { const ctx = AudioSys.ctx; if (!ctx || !this.playing) return; if (this.nextTime < ctx.currentTime - 0.05) this.nextTime = ctx.currentTime + 0.05; while (this.nextTime < ctx.currentTime + 0.12) { try { this.playStep(this.step % 128, this.nextTime); } catch (e) {} this.nextTime += 60 / this.BPM / 4; this.step++; } },
+            stop() { if (!this.playing) return; this.playing = false; clearInterval(this.timer); this.timer = null; const bus = this.bus, ctx = AudioSys.ctx; if (bus && ctx) { const t = ctx.currentTime; bus.gain.cancelScheduledValues(t); bus.gain.setValueAtTime(bus.gain.value, t); bus.gain.linearRampToValueAtTime(0, t + 0.4); setTimeout(() => { try { bus.disconnect(); } catch (e) {} }, 600); } },
+            setLevel(lvl) { this.target = lvl >= 16 ? 2 : (lvl >= 6 ? 1 : 0); },
+            setMuted(m) { this.muted = m; try { localStorage.setItem('speedangloMusicMuted', m ? '1' : '0'); } catch (e) {} if (this.bus && AudioSys.ctx) this.bus.gain.setTargetAtTime(m ? 0 : this.VOLUME, AudioSys.ctx.currentTime, 0.04); this.updateButton(); },
+            updateButton() { const b = document.getElementById('music-toggle-btn'); if (!b) return; b.textContent = this.muted ? '🔇' : '🎵'; b.classList.toggle('muted', this.muted); }
+        };
+        function toggleMusic() { MusicSys.setMuted(!MusicSys.muted); }
+
+        const canvas = document.getElementById('canvas-particles'); const ctx = canvas.getContext('2d'); let particles = [];
+        function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; } window.addEventListener('resize', resizeCanvas); resizeCanvas();
+        class Particle { constructor(x, y, color) { this.x = x; this.y = y; this.color = color; const angle = Math.random() * Math.PI * 2; const speed = Math.random() * 4 + 2; this.vx = Math.cos(angle) * speed; this.vy = Math.sin(angle) * speed; this.life = 1.0; this.decay = Math.random() * 0.04 + 0.02; } update() { this.x += this.vx; this.y += this.vy; this.life -= this.decay; } draw(ctx) { if (this.life <= 0) return; ctx.globalAlpha = this.life; ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, 3, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1.0; } }
+        function spawnParticles(x, y, color) { for (let i = 0; i < 12; i++) particles.push(new Particle(x, y, color)); }
+        function updateParticles() { ctx.clearRect(0, 0, canvas.width, canvas.height); for (let i = particles.length - 1; i >= 0; i--) { particles[i].update(); particles[i].draw(ctx); if (particles[i].life <= 0) particles.splice(i, 1); } }
+
+        const DIFF = { groupSize: 10, baseMax: 10, maxGrowth: 6, mulBase: 8, mulGrowth: 2, decimalFromLevel: 50, decimalChance: 0.15, opMul: 0.35, opDiv: 0.35, opAdd: 0.15, threeTermsFromLevel: 15, threeTermsChance: 0.25, threeTermsChance60s: 0.15, hardFromLevel: 10, hardFullLevel: 30, easyRejectAt10: 0.40, easyRejectAt20: 0.70, easyRejectAt30: 0.90, easyRejectAfter30: 0.95, highLevelGrowthFrom: 10, highLevelGrowth: 0.2 };
+
+        function easyRejectChance(lvl) { if (lvl < DIFF.hardFromLevel) return 0; if (lvl < 20) { const t = (lvl - 10) / 10; return DIFF.easyRejectAt10 + t * (DIFF.easyRejectAt20 - DIFF.easyRejectAt10); } if (lvl < DIFF.hardFullLevel) { const t = (lvl - 20) / 10; return DIFF.easyRejectAt20 + t * (DIFF.easyRejectAt30 - DIFF.easyRejectAt20); } return DIFF.easyRejectAfter30; }
+
+        function isEasyQuestion(a, b, op, c = null, op2 = null, maxNum = 10, lvl = 1) { const relativeSmall = Math.max(4, Math.floor(maxNum * (lvl >= 20 ? 0.32 : lvl >= 10 ? 0.45 : 0.55))); let easy = false; if (op === '+') { easy = (a <= relativeSmall && b <= relativeSmall) || (a + b <= relativeSmall * 1.5); } else if (op === '*') { const mulA = Math.max(4, Math.floor(relativeSmall * 0.75)); const mulB = Math.max(8, Math.floor(relativeSmall * 1.15)); easy = (a <= mulA && b <= mulB) || (a <= 4 && b <= 10) || (b <= 4 && a <= 10); } else if (op === '-') { easy = (a <= relativeSmall && b <= relativeSmall) || (a - b <= Math.max(5, relativeSmall * 0.55)); } else if (op === '/') { easy = (b <= Math.max(8, relativeSmall) && a <= relativeSmall * 3); } if (c !== null && op2 !== null) { const secondEasy = (op2 === '+' || op2 === '-') ? c <= relativeSmall : c <= Math.max(8, Math.floor(relativeSmall * 0.9)); easy = easy && secondEasy; } return easy; }
+
+        function generateQuestion(attempt = 0) {
+            const lvl = state.level; const isMode60 = (state.currentMode === '60s'); const group = Math.floor((lvl - 1) / DIFF.groupSize); const extraHighLevel = (!isMode60 && lvl >= DIFF.highLevelGrowthFrom) ? Math.floor((lvl - DIFF.highLevelGrowthFrom) * DIFF.highLevelGrowth) : 0; const maxNum = DIFF.baseMax + (group * DIFF.maxGrowth) + extraHighLevel; const allowDecimals = (lvl >= DIFF.decimalFromLevel) && (Math.random() < DIFF.decimalChance); let op; const r = Math.random();
+            if (isMode60) { if (r < 0.30) op = '*'; else if (r < 0.60) op = '/'; else if (r < 0.82) op = '+'; else op = '-'; } else { if (r < DIFF.opMul) op = '*'; else if (r < DIFF.opMul + DIFF.opDiv) op = '/'; else if (r < DIFF.opMul + DIFF.opDiv + DIFF.opAdd) op = '+'; else op = '-'; }
+            function getNum() { if (allowDecimals) return Math.round((Math.random() * maxNum + 1) * 10) / 10; return Math.floor(Math.random() * maxNum) + 1; }
+            let a, b, ans;
+            
+            if (op === '/') { 
+                b = getNum();
+                ans = getNum(); 
+                a = Math.round((ans * b) * 100) / 100;
+                
+                if (a >= 1000 && b > 20) {
+                    b = Math.floor(Math.random() * 19) + 2;
+                    a = Math.round((ans * b) * 100) / 100;
+                }
+            } else if (op === '*') { 
+                if (allowDecimals) { a = getNum(); b = getNum(); } else { let minFactor = 2; if (!isMode60 && lvl >= 10) minFactor = Math.min(7, 2 + Math.floor((lvl - 10) / 7)); const range = DIFF.mulBase + group * DIFF.mulGrowth + (!isMode60 && lvl >= 10 ? Math.floor((lvl - 10) * 0.3) : 0); a = Math.floor(Math.random() * Math.max(2, range - minFactor + 1)) + minFactor; b = Math.floor(Math.random() * Math.max(2, range - minFactor + 1)) + minFactor; } ans = Math.round((a * b) * 100) / 100; 
+            } else if (op === '-') { 
+                a = getNum(); b = getNum(); if (a < b) [a, b] = [b, a]; ans = Math.round((a - b) * 100) / 100; 
+            } else { 
+                a = getNum(); b = getNum(); ans = Math.round((a + b) * 100) / 100; 
+            }
+            let text = `${a} ${op === '*' ? '×' : op === '/' ? '÷' : op} ${b}`;
+            const threeTerms = isMode60 ? (Math.random() < DIFF.threeTermsChance60s) : (lvl >= DIFF.threeTermsFromLevel && Math.random() < DIFF.threeTermsChance); let c = null; let op2 = null;
+            if (threeTerms) { c = getNum(); op2 = Math.random() < 0.5 ? '+' : '-'; if (op2 === '-' && ans < c) op2 = '+'; ans = op2 === '+' ? ans + c : ans - c; text += ` ${op2} ${c}`; } ans = Math.round(ans * 100) / 100;
+            let options = new Set([ans]); let step = 1; if (allowDecimals && !Number.isInteger(ans)) { if (Math.round(ans * 100) % 25 === 0) step = 0.25; else step = 0.2; }
+            let tries = 0; while (options.size < 6 && tries < 60) { tries++; let delta = (Math.floor(Math.random() * 10) - 5) * step; if (delta === 0) delta = step; let fake = Math.round((ans + delta) * 100) / 100; if (fake >= 0 && fake !== ans) options.add(fake); }
+            let fill = 1; while (options.size < 6) { let fake = Math.round((ans + fill * step) * 100) / 100; if (fake >= 0) options.add(fake); fill++; }
+            if (!isMode60) { const easy = isEasyQuestion(a, b, op, threeTerms ? c : null, threeTerms ? op2 : null, maxNum, lvl); if (easy && Math.random() < easyRejectChance(lvl) && attempt < 80) { return generateQuestion(attempt + 1); } }
+            text = text.replace(/\./g, ','); return { text: text, answer: ans, options: Array.from(options).sort(() => Math.random() - 0.5) };
+        }
+
+        function showScreen(id) { document.querySelectorAll('.screen').forEach(el => el.classList.remove('active-screen')); document.getElementById(id).classList.add('active-screen'); }
+
+        async function fetchLeaderboardForGame(mode) {
+            state.currentLeaderboard = [];
+            const sb = getSupabase();
+            if (!sb) return;
+            try {
+                if (mode === '60s') {
+                    const { data } = await sb.from('ranking_60s').select('nome, score').order('score', { ascending: false }).limit(30);
+                    if (data) state.currentLeaderboard = data;
+                } else {
+                    const { data } = await sb.from('ranking').select('nome, level').eq('modo', mode).order('level', { ascending: false }).limit(30);
+                    if (data) state.currentLeaderboard = data;
+                }
+            } catch (e) { console.error("Erro ao buscar alvos:", e); }
+        }
+
+        function startMode(mode) {
+            state.currentMode = mode; state.isPlaying = true; state.level = 1; state.score = 0; state.streak = 0; state.lastFrameTime = 0;
+            if (mode === '60s') { state.totalTimerLimit = 60; state.questionTime = 60; } else { state.totalTimerLimit = 15; state.questionTime = 15; }
+            document.getElementById('options-container').style.display = mode === 'multipla' ? 'grid' : 'none';
+            document.getElementById('keypad-container').style.display = mode === 'multipla' ? 'none' : 'grid';
+            document.getElementById('input-display').style.display = mode === 'multipla' ? 'none' : 'block';
+            document.getElementById('streak-display').style.display = 'none';
+            document.getElementById('target-display').style.display = 'none';
+            
+            updateCheatVisibility();
+            fetchLeaderboardForGame(mode);
+            showScreen('game-screen'); MusicSys.start(); nextQuestion();
+            if (state.animationReq) cancelAnimationFrame(state.animationReq); state.animationReq = requestAnimationFrame(gameLoop);
+        }
+        
+        function abortGame() { state.isPlaying = false; MusicSys.stop(); if (state.animationReq) cancelAnimationFrame(state.animationReq); showScreen('menu-screen'); }
+
+        function nextQuestion() {
+            if (state.currentMode !== '60s') state.questionTime = state.totalTimerLimit; 
+            state.questionStartTime = Date.now(); MusicSys.setLevel(state.level);
+            state.currentQuestion = generateQuestion(); state.currentInput = "";
+            document.getElementById('question-display').textContent = state.currentQuestion.text;
+            if (state.currentMode === 'multipla') {
+                const container = document.getElementById('options-container'); container.innerHTML = "";
+                state.currentQuestion.options.forEach(opt => { const btn = document.createElement('button'); btn.className = 'option-btn'; btn.textContent = String(opt).replace('.', ','); btn.onclick = () => checkAnswer(opt); container.appendChild(btn); });
+            }
+            updateDisplay();
+        }
+
+        function checkAnswer(userAns) {
+            if (!state.isPlaying) return;
+            const parsedAns = parseFloat(String(userAns).replace(',', '.'));
+            const isCorrect = Math.abs(parsedAns - state.currentQuestion.answer) < 0.05;
+            const card = document.getElementById('question-card');
+            
+            if (isCorrect) {
+                if (state.currentMode === '60s') {
+                    const timeTaken = (Date.now() - state.questionStartTime) / 1000;
+                    let speedBonus = 0;
+                    if (timeTaken <= 1.0) { speedBonus = Math.floor(500 - (timeTaken * 300));
+                    } else { const secs = Math.floor(timeTaken); if (secs === 1) speedBonus = 150; else if (secs === 2) speedBonus = 100; else if (secs === 3) speedBonus = 50; else speedBonus = 0; }
+                    let streakBonus = state.streak >= 10 ? 250 : 0; state.score += 100 + speedBonus + streakBonus; state.streak++; state.level++;
+                } else { state.score += 10 + (state.level * 2); state.level++; }
+
+                AudioSys.correct(); card.classList.add('correct-flash'); setTimeout(() => card.classList.remove('correct-flash'), 200);
+                spawnParticles(window.innerWidth / 2, 200, document.body.classList.contains('light-mode') ? '#2e7d32' : '#22c55e');
+                nextQuestion();
+            } else {
+                card.classList.add('wrong-flash'); setTimeout(() => card.classList.remove('wrong-flash'), 200); spawnParticles(window.innerWidth / 2, 200, '#c62828'); AudioSys.wrong();
+                if (state.currentMode === '60s') { state.score = Math.max(0, state.score - 150); state.streak = 0; state.currentInput = ""; updateDisplay();
+                } else { endGame('Resposta Incorreta'); }
+            }
+        }
+
+        function autoSolve() { if (!state.isPlaying || !state.currentQuestion) return; const correctStr = String(state.currentQuestion.answer).replace('.', ','); if (state.currentMode === 'multipla') { checkAnswer(state.currentQuestion.answer); } else { state.currentInput = correctStr; submitAnswer(); } }
+        function updateCheatVisibility() { const cheatBtn = document.getElementById('btn-cheat-auto'); const cheatBanner = document.getElementById('hack-banner'); if (state.cheatMode) { cheatBtn.style.display = 'block'; cheatBanner.style.display = 'block'; } else { cheatBtn.style.display = 'none'; cheatBanner.style.display = 'none'; } }
+        function submitAnswer() { if (state.currentInput === "") return; checkAnswer(state.currentInput); }
+        function inputChar(c) { if (c === '.') c = ','; if (c === ',' && state.currentInput.includes(',')) return; if (state.currentInput.length < 8) { state.currentInput += c; updateDisplay(); } }
+        function inputDel() { state.currentInput = state.currentInput.slice(0, -1); updateDisplay(); }
+
+        window.addEventListener('keydown', (e) => {
+            if ((e.key === 'm' || e.key === 'M') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && e.target.tagName !== 'INPUT') toggleMusic();
+            state.typedKeysBuffer += e.key.toLowerCase(); if (state.typedKeysBuffer.length > 10) { state.typedKeysBuffer = state.typedKeysBuffer.slice(-10); }
+            if (state.typedKeysBuffer.endsWith('hack')) { state.cheatMode = false; updateCheatVisibility(); AudioSys.record(); }
+            const gameOverScreen = document.getElementById('game-over-screen');
+            if (gameOverScreen && gameOverScreen.classList.contains('active-screen')) {
+                if (e.key === 'Enter') { const nameInput = document.getElementById('player-name'); const rankingSection = document.getElementById('ranking-input-section'); if (document.activeElement === nameInput && rankingSection && rankingSection.style.display !== 'none') { submitRankingName(); } else { startMode(state.currentMode); } return; }
+            }
+            if (!state.isPlaying) return;
+            if (state.cheatMode && e.key.toLowerCase() === 'h') { autoSolve(); return; }
+            if (state.currentMode === 'multipla') return;
+            if ((e.key >= '0' && e.key <= '9') || e.key === '.' || e.key === ',') inputChar(e.key === '.' ? ',' : e.key);
+            else if (e.key === 'Backspace') inputDel(); else if (e.key === 'Enter') submitAnswer();
+        });
+
+        function updateTargetDisplay() {
+            const el = document.getElementById('target-display');
+            if (!el || state.currentLeaderboard.length === 0) return;
+
+            let metric = state.currentMode === '60s' ? state.score : state.level;
+            let target = null;
+            
+            for (let i = state.currentLeaderboard.length - 1; i >= 0; i--) {
+                let pScore = state.currentMode === '60s' ? state.currentLeaderboard[i].score : state.currentLeaderboard[i].level;
+                if (pScore > metric) {
+                    target = state.currentLeaderboard[i];
+                    break;
+                }
+            }
+
+            if (target) {
+                let diff = (state.currentMode === '60s' ? target.score : target.level) - metric;
+                let unit = state.currentMode === '60s' ? 'pts' : (diff === 1 ? 'nível' : 'níveis');
+                el.innerHTML = `🎯 Faltam <b>${diff} ${unit}</b> para passar "<b>${target.nome}</b>"`;
+                el.style.display = 'block';
+            } else {
+                el.innerHTML = `👑 <b>Você está em 1º lugar agora!</b>`;
+                el.style.display = 'block';
+            }
+        }
+
+        function updateDisplay() {
+            document.getElementById('input-display').textContent = state.currentInput;
+            if (state.currentMode === '60s') { document.getElementById('level-display').textContent = `✅ ${state.level - 1}`; document.getElementById('streak-display').style.display = state.streak >= 10 ? 'block' : 'none'; } else { document.getElementById('level-display').textContent = `🚩 LVL ${state.level}`; document.getElementById('streak-display').style.display = 'none'; }
+            document.getElementById('score-display').textContent = `⭐ ${state.score}`;
+            const pct = Math.max(0, (state.questionTime / state.totalTimerLimit) * 100); const timerBar = document.getElementById('timer-bar'); timerBar.style.width = `${pct}%`; timerBar.classList.toggle('danger', state.questionTime <= (state.currentMode === '60s' ? 5 : 3));
+            
+            updateTargetDisplay();
+        }
+
+        function gameLoop(timestamp) { if (!state.isPlaying) return; if (!state.lastFrameTime) state.lastFrameTime = timestamp; const dt = (timestamp - state.lastFrameTime) / 1000; state.lastFrameTime = timestamp; state.questionTime -= dt; if (state.questionTime <= 0) { state.questionTime = 0; endGame('Tempo Esgotado!'); } else { updateDisplay(); updateParticles(); state.animationReq = requestAnimationFrame(gameLoop); } }
+
+        function endGame(reason) {
+            state.isPlaying = false; MusicSys.stop(); AudioSys.gameOver();
+            document.getElementById('label-final-level').textContent = state.currentMode === '60s' ? "ACERTOS" : "SEU LEVEL"; document.getElementById('final-level').textContent = state.currentMode === '60s' ? state.level - 1 : state.level; document.getElementById('final-score').textContent = state.score; document.getElementById('final-equation').textContent = `${state.currentQuestion.text} = ${String(state.currentQuestion.answer).replace('.', ',')}`;
+            
+            const isRankingEligible = (state.currentMode === '60s' && state.score > 800) || (state.currentMode !== '60s' && state.level > 10);
+            const rs = document.getElementById('ranking-input-section');
+            if (isRankingEligible) { rs.style.display = 'block'; document.getElementById('player-name').value = ''; document.getElementById('btn-save-ranking').disabled = false; document.getElementById('btn-save-ranking').textContent = 'SALVAR NO RANKING'; document.getElementById('ranking-msg').style.display = 'none'; } else { rs.style.display = 'none'; }
+            showScreen('game-over-screen');
+        }
+
+        function saveLocalRecord(name, level_or_score, mode) {
+            let arr = mode === 'multipla' ? 'rankingMultipla' : mode === '60s' ? 'ranking60s' : 'rankingTeclado';
+            const cleanName = name.trim(); const idx = localRecords[arr].findIndex(i => (i.name || i.nome).toLowerCase() === cleanName.toLowerCase());
+            if (idx !== -1) { if (mode === '60s' && level_or_score > localRecords[arr][idx].score) localRecords[arr][idx].score = level_or_score; else if (mode !== '60s' && level_or_score > localRecords[arr][idx].level) localRecords[arr][idx].level = level_or_score; } else { if (mode === '60s') localRecords[arr].push({ name: cleanName, score: level_or_score }); else localRecords[arr].push({ name: cleanName, level: level_or_score }); }
+            localRecords[arr].sort((a, b) => mode === '60s' ? b.score - a.score : b.level - a.level); localStorage.setItem('speedangloRecordsV1', JSON.stringify(localRecords));
+        }
+
+        async function submitRankingName() {
+            let rawName = document.getElementById('player-name').value.trim();
+            
+            if (rawName === '') {
+                rawName = 'Anônimo #' + Math.floor(1000 + Math.random() * 9000);
+            }
+
+            const btn = document.getElementById('btn-save-ranking'); const msg = document.getElementById('ranking-msg');
+            btn.disabled = true; btn.textContent = 'Salvando...'; msg.style.display = 'block'; msg.style.color = 'var(--primary)'; msg.textContent = 'Enviando...';
+
+            const metric = state.currentMode === '60s' ? state.score : state.level;
+            saveLocalRecord(rawName, metric, state.currentMode);
+
+            const sb = getSupabase();
+            if (sb) {
+                try {
+                    let err = null;
+                    if (state.currentMode === '60s') {
+                        const { error } = await sb.rpc('salvar_maior_score_60s', { p_nome: rawName, p_score: state.score }); err = error;
+                    } else {
+                        const { error } = await sb.rpc('salvar_maior_score', { p_nome: rawName, p_score: state.level, p_modo: state.currentMode }); err = error;
+                    }
+
+                    // FALLBACK: Usar upsert direto caso a função RPC por algum motivo falhe
+                    if (err) {
+                        console.warn("RPC falhou, executando upsert...", err);
+                        if (state.currentMode === '60s') {
+                            const { data: existing } = await sb.from('ranking_60s').select('score').eq('nome', rawName).maybeSingle();
+                            if (!existing || state.score > existing.score) {
+                                await sb.from('ranking_60s').upsert({ nome: rawName, score: state.score }, { onConflict: 'nome' });
+                            }
+                        } else {
+                            const { data: existing } = await sb.from('ranking').select('level').eq('nome', rawName).eq('modo', state.currentMode).maybeSingle();
+                            if (!existing || state.level > existing.level) {
+                                await sb.from('ranking').upsert({ nome: rawName, level: state.level, modo: state.currentMode }, { onConflict: 'nome,modo' });
+                            }
+                        }
+                    }
+
+                    AudioSys.record();
+                } catch (e) { 
+                    console.error("Erro Supabase:", e); 
+                }
+            }
+            document.getElementById('ranking-input-section').style.display = 'none'; openRankingScreen(state.currentMode);
+        }
+
+        async function openRankingScreen(targetTab = 'teclado') {
+            showScreen('records-screen');
+            document.getElementById('tab-teclado').classList.toggle('active', targetTab === 'teclado'); document.getElementById('tab-multipla').classList.toggle('active', targetTab === 'multipla'); document.getElementById('tab-60s').classList.toggle('active', targetTab === '60s');
+            const listEl = document.getElementById('ranking-list'); listEl.innerHTML = '<div class="loading-text">Buscando dados... 🌐</div>';
+            const sb = getSupabase();
+            if (sb) {
+                try {
+                    let data, error;
+                    if (targetTab === '60s') { const res = await sb.from('ranking_60s').select('nome, score').order('score', { ascending: false }).limit(30); data = res.data; error = res.error;
+                    } else { const res = await sb.from('ranking').select('nome, level').eq('modo', targetTab).order('level', { ascending: false }).limit(30); data = res.data; error = res.error; }
+                    if (!error && data) { renderHTMLList(data, listEl, false, targetTab); return; }
+                } catch (e) { console.error("Erro busca Supabase:", e); }
+            }
+            let localData = targetTab === 'multipla' ? localRecords.rankingMultipla : targetTab === '60s' ? localRecords.ranking60s : localRecords.rankingTeclado; renderHTMLList(localData, listEl, true, targetTab);
+        }
+
+        function renderHTMLList(data, listEl, isLocal = false, mode) {
+            listEl.innerHTML = '';
+            if (!data || data.length === 0) { listEl.innerHTML = `<div style="text-align:center; padding: 30px; color: var(--subtitle-color); font-style: italic;">Nenhum registro encontrado ainda.<br><br>Seja o primeiro!</div>`; return; }
+            if (isLocal) listEl.innerHTML = `<div style="text-align:center; padding: 5px; font-size: 0.8rem; color: var(--subtitle-color);">Exibindo Ranking Local</div>`;
+            data.forEach((entry, idx) => {
+                let rankClass = ''; let icon = `#${idx + 1}`;
+                if (idx === 0) { rankClass = 'rank-1'; icon = '👑'; } else if (idx === 1) { rankClass = 'rank-2'; icon = '🥈'; } else if (idx === 2) { rankClass = 'rank-3'; icon = '🥉'; }
+                let metricText = mode === '60s' ? `⭐ ${entry.score}` : `Lvl ${entry.level}`;
+                listEl.innerHTML += `<div class="ranking-item ${rankClass}"><div class="rank-pos">${icon}</div><div class="rank-name">${entry.nome || entry.name}</div><div class="rank-lvl">${metricText}</div></div>`;
+            });
+        }
+
+        window.onload = () => {
+            const r = JSON.parse(localStorage.getItem('speedangloRecordsV1'));
+            if (r) localRecords = { ...localRecords, ...r }; if (!localRecords.ranking60s) localRecords.ranking60s = [];
+            try { MusicSys.muted = localStorage.getItem('speedangloMusicMuted') === '1'; } catch (e) {} MusicSys.updateButton();
+            if (localStorage.getItem('speedangloTheme') === 'light') { document.body.classList.add('light-mode'); document.getElementById('theme-toggle-btn').textContent = '🌙'; }
+        };
+    </script>
+</body>
+</html>
