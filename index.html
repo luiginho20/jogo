@@ -281,18 +281,17 @@
             const extraHighLevel = (!isMode60 && lvl >= DIFF.highLevelGrowthFrom) ? Math.floor((lvl - DIFF.highLevelGrowthFrom) * DIFF.highLevelGrowth) : 0; 
             const maxNum = DIFF.baseMax + (group * DIFF.maxGrowth) + extraHighLevel; 
             
-            // 1. REGRAS DE PROBABILIDADE POR NÍVEL
+            // 1. REGRAS DE PORCENTAGEM POR NÍVEL
             let allowDecimals = false;
             if (lvl > 50) {
-                allowDecimals = Math.random() < 0.15; // > 50: 15% fixa
+                allowDecimals = Math.random() < 0.15; // Nível > 50: 15% de probabilidade
             } else if (lvl >= 45) {
-                allowDecimals = Math.random() < 0.10; // 45 a 50: 10% fixa
-            } 
-            // < 45 permanece false (0% de chance)
-
-            // 2. ARRAYS DE DECIMAIS AMIGÁVEIS
-            const genDecs = [0.2, 0.25, 0.4, 0.5, 0.75, 0.8]; // Geração Geral
-            const mulDecs = [1.2, 1.25, 1.5, 1.75, 2.5];      // Filtro da Multiplicação
+                allowDecimals = Math.random() < 0.10; // Nível 45 a 50: 10% de probabilidade
+            }
+            // Abaixo do nível 45 permanece false (0%)
+            
+            // 2. DECIMAIS AMIGÁVEIS (Apenas aplicados à soma e subtração)
+            const genDecs = [0.2, 0.25, 0.4, 0.5, 0.75, 0.8];
 
             let op; const r = Math.random();
             if (isMode60) { 
@@ -301,12 +300,12 @@
                 if (r < DIFF.opMul) op = '*'; else if (r < DIFF.opMul + DIFF.opDiv) op = '/'; else if (r < DIFF.opMul + DIFF.opDiv + DIFF.opAdd) op = '+'; else op = '-'; 
             }
             
-            // 3. FUNÇÃO INTERNA ATUALIZADA PARA FINAIS REDONDOS
+            // 3. GERADOR DE NÚMEROS (forceInt = true bloqueia decimais)
             function getNum(forceInt = false) { 
                 if (allowDecimals && !forceInt) { 
                     const intPart = Math.floor(Math.random() * maxNum) + 1;
                     const decPart = genDecs[Math.floor(Math.random() * genDecs.length)];
-                    return intPart + decPart; // Ex: 14 + 0.25 = 14.25
+                    return intPart + decPart; 
                 } 
                 return Math.floor(Math.random() * maxNum) + 1; 
             }
@@ -314,8 +313,9 @@
             let a, b, ans;
             
             if (op === '/') { 
-                b = getNum(true); // Força divisor ser inteiro (ex: divide por 4, não por 4.5) para ser viável mentalmente
-                ans = getNum();   // Resposta pode ter final amigável
+                // DIVISÃO: Divisor e Resultado são forçados a serem inteiros
+                b = getNum(true); 
+                ans = getNum(true); 
                 a = Math.round((ans * b) * 100) / 100;
                 
                 if (a >= 1000 && b > 20) {
@@ -323,24 +323,21 @@
                     a = Math.round((ans * b) * 100) / 100;
                 }
             } else if (op === '*') { 
-                if (allowDecimals) { 
-                    // 4. LÓGICA DE MULTIPLICAÇÃO CONTIDA
-                    a = mulDecs[Math.floor(Math.random() * mulDecs.length)]; // Puxa (1.2, 1.5, 2.5, 1.75, 1.25)
-                    b = getNum(true); // O multiplicador será um inteiro (ex: 1.5 * 12)
-                    if (Math.random() > 0.5) [a, b] = [b, a]; // Mistura quem vem primeiro
-                } else { 
-                    let minFactor = 2; 
-                    if (!isMode60 && lvl >= 10) minFactor = Math.min(7, 2 + Math.floor((lvl - 10) / 7)); 
-                    const range = DIFF.mulBase + group * DIFF.mulGrowth + (!isMode60 && lvl >= 10 ? Math.floor((lvl - 10) * 0.3) : 0); 
-                    a = Math.floor(Math.random() * Math.max(2, range - minFactor + 1)) + minFactor; 
-                    b = Math.floor(Math.random() * Math.max(2, range - minFactor + 1)) + minFactor; 
-                } 
+                // MULTIPLICAÇÃO: Fatores são gerados apenas como inteiros
+                let minFactor = 2; 
+                if (!isMode60 && lvl >= 10) minFactor = Math.min(7, 2 + Math.floor((lvl - 10) / 7)); 
+                const range = DIFF.mulBase + group * DIFF.mulGrowth + (!isMode60 && lvl >= 10 ? Math.floor((lvl - 10) * 0.3) : 0); 
+                a = Math.floor(Math.random() * Math.max(2, range - minFactor + 1)) + minFactor; 
+                b = Math.floor(Math.random() * Math.max(2, range - minFactor + 1)) + minFactor; 
+                
                 ans = Math.round((a * b) * 100) / 100; 
             } else if (op === '-') { 
+                // SUBTRAÇÃO: Pode receber decimais se allowDecimals for true
                 a = getNum(); b = getNum(); 
                 if (a < b) [a, b] = [b, a]; 
                 ans = Math.round((a - b) * 100) / 100; 
             } else { 
+                // SOMA (+): Pode receber decimais se allowDecimals for true
                 a = getNum(); b = getNum(); 
                 ans = Math.round((a + b) * 100) / 100; 
             }
@@ -350,6 +347,7 @@
             let c = null; let op2 = null;
             
             if (threeTerms) { 
+                // O terceiro termo é sempre + ou -, permitindo decimais apenas nesta etapa subtrativa/aditiva
                 c = getNum(); 
                 op2 = Math.random() < 0.5 ? '+' : '-'; 
                 if (op2 === '-' && ans < c) op2 = '+'; 
