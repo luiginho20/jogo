@@ -43,6 +43,17 @@
         .theme-toggle { position: fixed; top: 20px; right: 20px; background: var(--panel-bg); border: 2px solid var(--border-color); color: var(--text-color); font-size: 1.3rem; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; z-index: 100; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px var(--shadow-base); transition: all 0.3s; }
         .theme-toggle:hover { transform: scale(1.1); border-color: var(--primary); box-shadow: var(--primary-glow); }
         .music-toggle { right: 75px; } .music-toggle.muted { color: var(--wrong); border-color: var(--wrong); }
+        .fullscreen-toggle { right: 130px; }
+
+        /* POP-UP TELA CHEIA */
+        .fullscreen-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.25); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .fullscreen-overlay.hidden { display: none; }
+        .fullscreen-modal { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 18px; padding: 28px 24px; width: 100%; max-width: 300px; text-align: center; box-shadow: 0 15px 35px var(--shadow-base); }
+        .fullscreen-modal .fs-icon { font-size: 2.3rem; margin-bottom: 8px; }
+        .fullscreen-modal h3 { color: var(--primary); font-size: 1.05rem; margin-bottom: 6px; text-shadow: var(--primary-glow); }
+        .fullscreen-modal p { color: var(--subtitle-color); font-size: 0.82rem; line-height: 1.4; margin-bottom: 18px; }
+        .fullscreen-modal .btn { margin-bottom: 8px; }
+        .fullscreen-modal .btn-skip { background: transparent; border-color: var(--subtitle-color); color: var(--subtitle-color); font-size: 0.8rem; padding: 8px 20px; margin-bottom: 0; }
 
         .close-btn { position: fixed; top: 20px; left: 20px; background: var(--panel-bg); border: 2px solid var(--border-color); color: var(--wrong); font-size: 1.2rem; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; z-index: 100; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px var(--shadow-base); transition: all 0.3s; font-weight: bold; }
         .close-btn:hover { transform: scale(1.1); border-color: var(--wrong); box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); }
@@ -122,6 +133,18 @@
     <canvas id="canvas-particles"></canvas>
     <button id="theme-toggle-btn" class="theme-toggle" onclick="toggleTheme()">☀️</button>
     <button id="music-toggle-btn" class="theme-toggle music-toggle" onclick="toggleMusic(); this.blur();" title="Silenciar música (tecla M)">🎵</button>
+    <button id="fullscreen-toggle-btn" class="theme-toggle fullscreen-toggle" onclick="toggleFullscreen(); this.blur();" title="Ativar tela cheia (tecla F)">⛶</button>
+
+    <!-- POP-UP TELA CHEIA -->
+    <div id="fullscreen-overlay" class="fullscreen-overlay">
+        <div class="fullscreen-modal">
+            <div class="fs-icon">⛶</div>
+            <h3>Tela Cheia</h3>
+            <p>Ative a tela cheia para uma experiência melhor.</p>
+            <button class="btn" onclick="confirmFullscreen()">OK, ATIVAR</button>
+            <button class="btn btn-skip" onclick="closeFullscreenModal()">Agora não</button>
+        </div>
+    </div>
 
     <!-- MENU -->
     <div id="menu-screen" class="screen active-screen">
@@ -201,6 +224,34 @@
     </div>
 
     <script>
+        // TELA CHEIA
+        function requestFullscreenSafe() {
+            const el = document.documentElement;
+            const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+            if (req) { try { const p = req.call(el); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+        }
+        function exitFullscreenSafe() {
+            const ex = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+            if (ex) { try { const p = ex.call(document); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+        }
+        function isFullscreenActive() {
+            return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+        }
+        function toggleFullscreen() { isFullscreenActive() ? exitFullscreenSafe() : requestFullscreenSafe(); }
+        function updateFullscreenButton() {
+            const btn = document.getElementById('fullscreen-toggle-btn');
+            if (!btn) return;
+            const active = isFullscreenActive();
+            btn.classList.toggle('active', active);
+            btn.title = active ? 'Sair da tela cheia (tecla F)' : 'Ativar tela cheia (tecla F)';
+        }
+        function closeFullscreenModal() {
+            const overlay = document.getElementById('fullscreen-overlay');
+            if (overlay) overlay.classList.add('hidden');
+        }
+        function confirmFullscreen() { requestFullscreenSafe(); closeFullscreenModal(); }
+        ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(evt => document.addEventListener(evt, updateFullscreenButton));
+
         function toggleTheme() {
             document.body.classList.toggle('light-mode');
             const isLight = document.body.classList.contains('light-mode');
@@ -466,6 +517,7 @@
 
         window.addEventListener('keydown', (e) => {
             if ((e.key === 'm' || e.key === 'M') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && e.target.tagName !== 'INPUT') toggleMusic();
+            if ((e.key === 'f' || e.key === 'F') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && e.target.tagName !== 'INPUT') { toggleFullscreen(); closeFullscreenModal(); }
             state.typedKeysBuffer += e.key.toLowerCase(); if (state.typedKeysBuffer.length > 10) { state.typedKeysBuffer = state.typedKeysBuffer.slice(-10); }
             if (state.typedKeysBuffer.endsWith('hack')) { state.cheatMode = false; updateCheatVisibility(); AudioSys.record(); }
             const gameOverScreen = document.getElementById('game-over-screen');
@@ -613,6 +665,7 @@
             if (r) localRecords = { ...localRecords, ...r }; if (!localRecords.ranking60s) localRecords.ranking60s = [];
             try { MusicSys.muted = localStorage.getItem('speedangloMusicMuted') === '1'; } catch (e) {} MusicSys.updateButton();
             if (localStorage.getItem('speedangloTheme') === 'light') { document.body.classList.add('light-mode'); document.getElementById('theme-toggle-btn').textContent = '🌙'; }
+            updateFullscreenButton();
         };
     </script>
 </body>
