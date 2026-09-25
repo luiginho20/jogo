@@ -275,14 +275,47 @@
         function isEasyQuestion(a, b, op, c = null, op2 = null, maxNum = 10, lvl = 1) { const relativeSmall = Math.max(4, Math.floor(maxNum * (lvl >= 20 ? 0.32 : lvl >= 10 ? 0.45 : 0.55))); let easy = false; if (op === '+') { easy = (a <= relativeSmall && b <= relativeSmall) || (a + b <= relativeSmall * 1.5); } else if (op === '*') { const mulA = Math.max(4, Math.floor(relativeSmall * 0.75)); const mulB = Math.max(8, Math.floor(relativeSmall * 1.15)); easy = (a <= mulA && b <= mulB) || (a <= 4 && b <= 10) || (b <= 4 && a <= 10); } else if (op === '-') { easy = (a <= relativeSmall && b <= relativeSmall) || (a - b <= Math.max(5, relativeSmall * 0.55)); } else if (op === '/') { easy = (b <= Math.max(8, relativeSmall) && a <= relativeSmall * 3); } if (c !== null && op2 !== null) { const secondEasy = (op2 === '+' || op2 === '-') ? c <= relativeSmall : c <= Math.max(8, Math.floor(relativeSmall * 0.9)); easy = easy && secondEasy; } return easy; }
 
         function generateQuestion(attempt = 0) {
-            const lvl = state.level; const isMode60 = (state.currentMode === '60s'); const group = Math.floor((lvl - 1) / DIFF.groupSize); const extraHighLevel = (!isMode60 && lvl >= DIFF.highLevelGrowthFrom) ? Math.floor((lvl - DIFF.highLevelGrowthFrom) * DIFF.highLevelGrowth) : 0; const maxNum = DIFF.baseMax + (group * DIFF.maxGrowth) + extraHighLevel; const allowDecimals = (lvl >= DIFF.decimalFromLevel) && (Math.random() < DIFF.decimalChance); let op; const r = Math.random();
-            if (isMode60) { if (r < 0.30) op = '*'; else if (r < 0.60) op = '/'; else if (r < 0.82) op = '+'; else op = '-'; } else { if (r < DIFF.opMul) op = '*'; else if (r < DIFF.opMul + DIFF.opDiv) op = '/'; else if (r < DIFF.opMul + DIFF.opDiv + DIFF.opAdd) op = '+'; else op = '-'; }
-            function getNum() { if (allowDecimals) return Math.round((Math.random() * maxNum + 1) * 10) / 10; return Math.floor(Math.random() * maxNum) + 1; }
+            const lvl = state.level; 
+            const isMode60 = (state.currentMode === '60s'); 
+            const group = Math.floor((lvl - 1) / DIFF.groupSize); 
+            const extraHighLevel = (!isMode60 && lvl >= DIFF.highLevelGrowthFrom) ? Math.floor((lvl - DIFF.highLevelGrowthFrom) * DIFF.highLevelGrowth) : 0; 
+            const maxNum = DIFF.baseMax + (group * DIFF.maxGrowth) + extraHighLevel; 
+            
+            // 1. REGRAS DE PROBABILIDADE POR NÍVEL
+            let allowDecimals = false;
+            if (lvl > 50) {
+                allowDecimals = Math.random() < 0.15; // > 50: 15% fixa
+            } else if (lvl >= 45) {
+                allowDecimals = Math.random() < 0.10; // 45 a 50: 10% fixa
+            } 
+            // < 45 permanece false (0% de chance)
+
+            // 2. ARRAYS DE DECIMAIS AMIGÁVEIS
+            const genDecs = [0.2, 0.25, 0.4, 0.5, 0.75, 0.8]; // Geração Geral
+            const mulDecs = [1.2, 1.25, 1.5, 1.75, 2.5];      // Filtro da Multiplicação
+
+            let op; const r = Math.random();
+            if (isMode60) { 
+                if (r < 0.30) op = '*'; else if (r < 0.60) op = '/'; else if (r < 0.82) op = '+'; else op = '-'; 
+            } else { 
+                if (r < DIFF.opMul) op = '*'; else if (r < DIFF.opMul + DIFF.opDiv) op = '/'; else if (r < DIFF.opMul + DIFF.opDiv + DIFF.opAdd) op = '+'; else op = '-'; 
+            }
+            
+            // 3. FUNÇÃO INTERNA ATUALIZADA PARA FINAIS REDONDOS
+            function getNum(forceInt = false) { 
+                if (allowDecimals && !forceInt) { 
+                    const intPart = Math.floor(Math.random() * maxNum) + 1;
+                    const decPart = genDecs[Math.floor(Math.random() * genDecs.length)];
+                    return intPart + decPart; // Ex: 14 + 0.25 = 14.25
+                } 
+                return Math.floor(Math.random() * maxNum) + 1; 
+            }
+            
             let a, b, ans;
             
             if (op === '/') { 
-                b = getNum();
-                ans = getNum(); 
+                b = getNum(true); // Força divisor ser inteiro (ex: divide por 4, não por 4.5) para ser viável mentalmente
+                ans = getNum();   // Resposta pode ter final amigável
                 a = Math.round((ans * b) * 100) / 100;
                 
                 if (a >= 1000 && b > 20) {
@@ -290,20 +323,70 @@
                     a = Math.round((ans * b) * 100) / 100;
                 }
             } else if (op === '*') { 
-                if (allowDecimals) { a = getNum(); b = getNum(); } else { let minFactor = 2; if (!isMode60 && lvl >= 10) minFactor = Math.min(7, 2 + Math.floor((lvl - 10) / 7)); const range = DIFF.mulBase + group * DIFF.mulGrowth + (!isMode60 && lvl >= 10 ? Math.floor((lvl - 10) * 0.3) : 0); a = Math.floor(Math.random() * Math.max(2, range - minFactor + 1)) + minFactor; b = Math.floor(Math.random() * Math.max(2, range - minFactor + 1)) + minFactor; } ans = Math.round((a * b) * 100) / 100; 
+                if (allowDecimals) { 
+                    // 4. LÓGICA DE MULTIPLICAÇÃO CONTIDA
+                    a = mulDecs[Math.floor(Math.random() * mulDecs.length)]; // Puxa (1.2, 1.5, 2.5, 1.75, 1.25)
+                    b = getNum(true); // O multiplicador será um inteiro (ex: 1.5 * 12)
+                    if (Math.random() > 0.5) [a, b] = [b, a]; // Mistura quem vem primeiro
+                } else { 
+                    let minFactor = 2; 
+                    if (!isMode60 && lvl >= 10) minFactor = Math.min(7, 2 + Math.floor((lvl - 10) / 7)); 
+                    const range = DIFF.mulBase + group * DIFF.mulGrowth + (!isMode60 && lvl >= 10 ? Math.floor((lvl - 10) * 0.3) : 0); 
+                    a = Math.floor(Math.random() * Math.max(2, range - minFactor + 1)) + minFactor; 
+                    b = Math.floor(Math.random() * Math.max(2, range - minFactor + 1)) + minFactor; 
+                } 
+                ans = Math.round((a * b) * 100) / 100; 
             } else if (op === '-') { 
-                a = getNum(); b = getNum(); if (a < b) [a, b] = [b, a]; ans = Math.round((a - b) * 100) / 100; 
+                a = getNum(); b = getNum(); 
+                if (a < b) [a, b] = [b, a]; 
+                ans = Math.round((a - b) * 100) / 100; 
             } else { 
-                a = getNum(); b = getNum(); ans = Math.round((a + b) * 100) / 100; 
+                a = getNum(); b = getNum(); 
+                ans = Math.round((a + b) * 100) / 100; 
             }
+            
             let text = `${a} ${op === '*' ? '×' : op === '/' ? '÷' : op} ${b}`;
-            const threeTerms = isMode60 ? (Math.random() < DIFF.threeTermsChance60s) : (lvl >= DIFF.threeTermsFromLevel && Math.random() < DIFF.threeTermsChance); let c = null; let op2 = null;
-            if (threeTerms) { c = getNum(); op2 = Math.random() < 0.5 ? '+' : '-'; if (op2 === '-' && ans < c) op2 = '+'; ans = op2 === '+' ? ans + c : ans - c; text += ` ${op2} ${c}`; } ans = Math.round(ans * 100) / 100;
-            let options = new Set([ans]); let step = 1; if (allowDecimals && !Number.isInteger(ans)) { if (Math.round(ans * 100) % 25 === 0) step = 0.25; else step = 0.2; }
-            let tries = 0; while (options.size < 6 && tries < 60) { tries++; let delta = (Math.floor(Math.random() * 10) - 5) * step; if (delta === 0) delta = step; let fake = Math.round((ans + delta) * 100) / 100; if (fake >= 0 && fake !== ans) options.add(fake); }
-            let fill = 1; while (options.size < 6) { let fake = Math.round((ans + fill * step) * 100) / 100; if (fake >= 0) options.add(fake); fill++; }
-            if (!isMode60) { const easy = isEasyQuestion(a, b, op, threeTerms ? c : null, threeTerms ? op2 : null, maxNum, lvl); if (easy && Math.random() < easyRejectChance(lvl) && attempt < 80) { return generateQuestion(attempt + 1); } }
-            text = text.replace(/\./g, ','); return { text: text, answer: ans, options: Array.from(options).sort(() => Math.random() - 0.5) };
+            const threeTerms = isMode60 ? (Math.random() < DIFF.threeTermsChance60s) : (lvl >= DIFF.threeTermsFromLevel && Math.random() < DIFF.threeTermsChance); 
+            let c = null; let op2 = null;
+            
+            if (threeTerms) { 
+                c = getNum(); 
+                op2 = Math.random() < 0.5 ? '+' : '-'; 
+                if (op2 === '-' && ans < c) op2 = '+'; 
+                ans = op2 === '+' ? ans + c : ans - c; 
+                text += ` ${op2} ${c}`; 
+            } 
+            ans = Math.round(ans * 100) / 100;
+            
+            let options = new Set([ans]); 
+            let step = 1; 
+            if (allowDecimals && !Number.isInteger(ans)) { 
+                if (Math.round(ans * 100) % 25 === 0) step = 0.25; else step = 0.2; 
+            }
+            
+            let tries = 0; 
+            while (options.size < 6 && tries < 60) { 
+                tries++; 
+                let delta = (Math.floor(Math.random() * 10) - 5) * step; 
+                if (delta === 0) delta = step; 
+                let fake = Math.round((ans + delta) * 100) / 100; 
+                if (fake >= 0 && fake !== ans) options.add(fake); 
+            }
+            
+            let fill = 1; 
+            while (options.size < 6) { 
+                let fake = Math.round((ans + fill * step) * 100) / 100; 
+                if (fake >= 0) options.add(fake); fill++; 
+            }
+            
+            if (!isMode60) { 
+                const easy = isEasyQuestion(a, b, op, threeTerms ? c : null, threeTerms ? op2 : null, maxNum, lvl); 
+                if (easy && Math.random() < easyRejectChance(lvl) && attempt < 80) { 
+                    return generateQuestion(attempt + 1); 
+                } 
+            }
+            text = text.replace(/\./g, ','); 
+            return { text: text, answer: ans, options: Array.from(options).sort(() => Math.random() - 0.5) };
         }
 
         function showScreen(id) { document.querySelectorAll('.screen').forEach(el => el.classList.remove('active-screen')); document.getElementById(id).classList.add('active-screen'); }
