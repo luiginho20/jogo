@@ -75,8 +75,8 @@
         .btn-cheat:hover { background-color: var(--correct) !important; color: #fff !important; }
 
         .game-header { display: flex; justify-content: space-between; align-items: center; width: 100%; font-size: 0.9rem; font-weight: bold; margin-bottom: 5px; background: var(--header-bg); padding: 12px 15px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 4px 10px var(--shadow-base); margin-top: 15px;}
-        .timer-container { flex-grow: 1; height: 12px; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 6px; margin: 0 10px; overflow: hidden; position: relative; }
-        .timer-bar { height: 100%; width: 100%; background: var(--primary); border-radius: 4px; transition: width 0.1s linear, background-color 0.3s; }
+        .timer-container { flex-grow: 1; height: 24px; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px; margin: 0 10px; overflow: hidden; position: relative; }
+        .timer-bar { height: 100%; width: 100%; background: var(--primary); border-radius: 10px; transition: width 0.1s linear, background-color 0.3s; }
         .timer-bar.danger { background: var(--wrong); box-shadow: 0 0 10px var(--wrong); animation: pulse-bar 0.5s infinite; }
 
         .level-badge { color: var(--gold); min-width: 65px; }
@@ -127,6 +127,49 @@
         @keyframes pulse-bar { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
         .correct-flash { border-color: var(--correct); }
         .wrong-flash { border-color: var(--wrong); }
+
+        /* ===== ANIMAÇÕES: curtas, só transform/opacity, nunca bloqueiam o input ===== */
+        :root { --ease: cubic-bezier(.22,1,.36,1); }
+        body::before, body::after { content:""; position:absolute; width:60vmax; height:60vmax; border-radius:50%; opacity:.16; pointer-events:none; z-index:0; will-change:transform; }
+        body::before { background:radial-gradient(circle,var(--primary),transparent 65%); top:-25vmax; left:-20vmax; animation:drift1 26s ease-in-out infinite alternate; }
+        body::after { background:radial-gradient(circle,var(--purple),transparent 65%); bottom:-28vmax; right:-22vmax; animation:drift2 32s ease-in-out infinite alternate; }
+        @keyframes drift1 { to { transform:translate(12vmax,10vmax) scale(1.15); } }
+        @keyframes drift2 { to { transform:translate(-10vmax,-8vmax) scale(1.1); } }
+        .active-screen { animation:screen-in .35s var(--ease) backwards; }
+        @keyframes screen-in { from { opacity:0; transform:translateY(14px); } }
+        @keyframes rise { from { opacity:0; transform:translateY(16px); } }
+        #menu-screen.active-screen > *, #records-screen.active-screen > *, #game-over-screen.active-screen > * { animation:rise .5s var(--ease) backwards; }
+        .active-screen > :nth-child(2) { animation-delay:.05s !important; } .active-screen > :nth-child(3) { animation-delay:.1s !important; }
+        .active-screen > :nth-child(4) { animation-delay:.15s !important; } .active-screen > :nth-child(5) { animation-delay:.2s !important; } .active-screen > :nth-child(6) { animation-delay:.25s !important; }
+        .btn, .key, .option-btn, .tab-btn { transition:transform .15s var(--ease), background-color .25s, border-color .25s, color .25s, box-shadow .25s; }
+        .btn:active, .key:active, .option-btn:active { transform:scale(.95); }
+        .key:hover { background-color:var(--hover-bg); }
+        .question-card { transition:box-shadow .25s, border-color .25s; }
+        .q-in { animation:q-in .22s var(--ease); }
+        @keyframes q-in { from { opacity:.3; transform:translateY(8px) scale(.98); } }
+        .correct-flash { box-shadow:0 0 28px rgba(34,197,94,.45); }
+        .wrong-flash { animation:shake .32s; box-shadow:0 0 28px rgba(239,68,68,.4); }
+        @keyframes shake { 0%,100% { transform:translateX(0); } 20% { transform:translateX(-9px); } 40% { transform:translateX(8px); } 60% { transform:translateX(-5px); } 80% { transform:translateX(3px); } }
+        .input-display::after { content:""; display:inline-block; width:2px; height:1.8rem; background:var(--primary); margin-left:3px; vertical-align:middle; animation:blink 1s steps(2) infinite; }
+        @keyframes blink { 50% { opacity:0; } }
+        .option-btn { animation:opt-in .25s var(--ease) backwards; }
+        .option-btn:nth-child(2) { animation-delay:.03s; } .option-btn:nth-child(3) { animation-delay:.06s; } .option-btn:nth-child(4) { animation-delay:.09s; }
+        @keyframes opt-in { from { opacity:.4; transform:translateY(6px); } }
+        .bump { animation:bump .35s var(--ease); }
+        @keyframes bump { 40% { transform:scale(1.25); } }
+        .float-pop { position:fixed; font-weight:800; font-size:1.5rem; pointer-events:none; z-index:50; animation:float-up .85s var(--ease) forwards; text-shadow:0 2px 8px var(--shadow-base); }
+        @keyframes float-up { 0% { opacity:0; transform:translate(-50%,0); } 15% { opacity:1; } 100% { opacity:0; transform:translate(-50%,-70px); } }
+        .active-screen .stat-box { animation:rise .5s var(--ease) backwards; }
+        .stat-box:nth-child(1) { animation-delay:.15s !important; } .stat-box:nth-child(2) { animation-delay:.25s !important; } .stat-box:nth-child(3) { animation-delay:.35s !important; }
+        .ranking-item { animation:rise .35s var(--ease) backwards; }
+
+        .btn-sub { display:block; margin-top:3px; font-size:.72rem; font-weight:600; letter-spacing:1px; opacity:.5; }
+        .emo { display:inline-block; font-size:1.45em; line-height:1; vertical-align:middle; margin-right:4px; transform-origin:50% 65%; transition:transform .25s var(--ease); }
+        .btn:hover .emo, .btn:focus-visible .emo, h1:hover .emo { transform:rotate(-14deg) scale(1.08); }
+        #menu-screen.active-screen > h1 { animation:none; }
+        .ch { display:inline-block; animation:ch-in .75s var(--ease) backwards; }
+        @keyframes ch-in { from { opacity:0; transform:translateY(-26px) scale(.6) rotate(-10deg); filter:blur(5px); } }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; } }
     </style>
 </head>
 <body>
@@ -150,10 +193,10 @@
     <div id="menu-screen" class="screen active-screen">
         <h1>SPEEDANGLO</h1>
         <p class="subtitle">Escolha seu modo de jogo</p>
-        <button class="btn" onclick="startMode('teclado')">⌨ TECLADO (SOBREVIVÊNCIA)</button>
-        <button class="btn btn-purple" onclick="startMode('multipla')">🎯 MÚLTIPLA ESCOLHA</button>
-        <button class="btn btn-orange" onclick="startMode('60s')">⏱ 60 SEGUNDOS (MAX SCORE)</button>
-        <button class="btn" style="background: transparent; border-color: var(--subtitle-color);" onclick="openRankingScreen()">🏆 RANKING GLOBAL</button>
+        <button class="btn" onclick="startMode('teclado')"><span class="emo">⌨</span> TECLADO<span class="btn-sub">(SOBREVIVÊNCIA)</span></button>
+        <button class="btn btn-purple" onclick="startMode('multipla')"><span class="emo">🎯</span> MÚLTIPLA ESCOLHA</button>
+        <button class="btn btn-orange" onclick="startMode('60s')"><span class="emo">⏱</span> 60 SEGUNDOS<span class="btn-sub">(MAX SCORE)</span></button>
+        <button class="btn" style="background: transparent; border-color: var(--subtitle-color);" onclick="openRankingScreen()"><span class="emo">🏆</span> RANKING GLOBAL</button>
     </div>
 
     <!-- JOGO -->
@@ -213,7 +256,7 @@
 
     <!-- RANKING -->
     <div id="records-screen" class="screen">
-        <h1>🏆 RANKING</h1>
+        <h1><span class="emo">🏆</span> RANKING</h1>
         <div class="tabs">
             <button id="tab-teclado" class="tab-btn active" onclick="openRankingScreen('teclado')">⌨ TECLADO</button>
             <button id="tab-multipla" class="tab-btn" onclick="openRankingScreen('multipla')">🎯 MÚLTIPLA</button>
@@ -224,6 +267,7 @@
     </div>
 
     <script>
+        (function () { const h = document.querySelector('#menu-screen h1'); const t = h.textContent; h.setAttribute('aria-label', t); h.innerHTML = [...t].map((c, i) => `<span class="ch" aria-hidden="true" style="animation-delay:${i * 60}ms">${c}</span>`).join(''); })();
         // TELA CHEIA
         function requestFullscreenSafe() {
             const el = document.documentElement;
@@ -455,9 +499,10 @@
             } catch (e) { console.error("Erro ao buscar alvos:", e); }
         }
 
+        const TIME_QUESTION = 15, TIME_SPRINT = 60; // segundos: por pergunta (teclado/múltipla) e duração do modo sprint
         function startMode(mode) {
             state.currentMode = mode; state.isPlaying = true; state.level = 1; state.score = 0; state.streak = 0; state.lastFrameTime = 0;
-            if (mode === '60s') { state.totalTimerLimit = 60; state.questionTime = 60; } else { state.totalTimerLimit = 15; state.questionTime = 15; }
+            if (mode === '60s') { state.totalTimerLimit = TIME_SPRINT; state.questionTime = TIME_SPRINT; } else { state.totalTimerLimit = TIME_QUESTION; state.questionTime = TIME_QUESTION; }
             document.getElementById('options-container').style.display = mode === 'multipla' ? 'grid' : 'none';
             document.getElementById('keypad-container').style.display = mode === 'multipla' ? 'none' : 'grid';
             document.getElementById('input-display').style.display = mode === 'multipla' ? 'none' : 'block';
@@ -476,7 +521,7 @@
             if (state.currentMode !== '60s') state.questionTime = state.totalTimerLimit; 
             state.questionStartTime = Date.now(); MusicSys.setLevel(state.level);
             state.currentQuestion = generateQuestion(); state.currentInput = "";
-            document.getElementById('question-display').textContent = state.currentQuestion.text;
+            document.getElementById('question-display').textContent = state.currentQuestion.text; replay(document.getElementById('question-card'), 'q-in');
             if (state.currentMode === 'multipla') {
                 const container = document.getElementById('options-container'); container.innerHTML = "";
                 state.currentQuestion.options.forEach(opt => { const btn = document.createElement('button'); btn.className = 'option-btn'; btn.textContent = String(opt).replace('.', ','); btn.onclick = () => checkAnswer(opt); container.appendChild(btn); });
@@ -484,10 +529,14 @@
             updateDisplay();
         }
 
+        function replay(el, c) { el.classList.remove(c); void el.offsetWidth; el.classList.add(c); }
+        function bump(id) { replay(document.getElementById(id), 'bump'); }
+        function spawnAtCard(color) { const r = document.getElementById('question-card').getBoundingClientRect(); spawnParticles(r.left + r.width / 2, r.top + r.height / 2, color); }
+        function floatText(text, color) { const r = document.getElementById('question-card').getBoundingClientRect(); const d = document.createElement('div'); d.className = 'float-pop'; d.textContent = text; d.style.color = color; d.style.left = (r.left + r.width / 2) + 'px'; d.style.top = (r.top + 6) + 'px'; d.addEventListener('animationend', () => d.remove()); document.body.appendChild(d); }
         function checkAnswer(userAns) {
             if (!state.isPlaying) return;
             const parsedAns = parseFloat(String(userAns).replace(',', '.'));
-            const isCorrect = Math.abs(parsedAns - state.currentQuestion.answer) < 0.05;
+            const isCorrect = Math.abs(parsedAns - state.currentQuestion.answer) < 0.05; const scoreBefore = state.score;
             const card = document.getElementById('question-card');
             
             if (isCorrect) {
@@ -499,11 +548,11 @@
                     let streakBonus = state.streak >= 10 ? 250 : 0; state.score += 100 + speedBonus + streakBonus; state.streak++; state.level++;
                 } else { state.score += 10 + (state.level * 2); state.level++; }
 
-                AudioSys.correct(); card.classList.add('correct-flash'); setTimeout(() => card.classList.remove('correct-flash'), 200);
-                spawnParticles(window.innerWidth / 2, 200, document.body.classList.contains('light-mode') ? '#2e7d32' : '#22c55e');
+                AudioSys.correct(); card.classList.add('correct-flash'); setTimeout(() => card.classList.remove('correct-flash'), 350); if (state.currentMode === '60s') floatText('+' + (state.score - scoreBefore), 'var(--correct)'); bump('score-display'); bump('level-display');
+                spawnAtCard(document.body.classList.contains('light-mode') ? '#2e7d32' : '#22c55e');
                 nextQuestion();
             } else {
-                card.classList.add('wrong-flash'); setTimeout(() => card.classList.remove('wrong-flash'), 200); spawnParticles(window.innerWidth / 2, 200, '#c62828'); AudioSys.wrong();
+                card.classList.add('wrong-flash'); setTimeout(() => card.classList.remove('wrong-flash'), 350); spawnAtCard('#c62828'); if (state.currentMode === '60s') floatText('-150', 'var(--wrong)'); AudioSys.wrong();
                 if (state.currentMode === '60s') { state.score = Math.max(0, state.score - 150); state.streak = 0; state.currentInput = ""; updateDisplay();
                 } else { endGame('Resposta Incorreta'); }
             }
@@ -656,7 +705,7 @@
                 let rankClass = ''; let icon = `#${idx + 1}`;
                 if (idx === 0) { rankClass = 'rank-1'; icon = '👑'; } else if (idx === 1) { rankClass = 'rank-2'; icon = '🥈'; } else if (idx === 2) { rankClass = 'rank-3'; icon = '🥉'; }
                 let metricText = mode === '60s' ? `⭐ ${entry.score}` : `Lvl ${entry.level}`;
-                listEl.innerHTML += `<div class="ranking-item ${rankClass}"><div class="rank-pos">${icon}</div><div class="rank-name">${entry.nome || entry.name}</div><div class="rank-lvl">${metricText}</div></div>`;
+                listEl.innerHTML += `<div class="ranking-item ${rankClass}" style="animation-delay:${Math.min(idx, 10) * 35}ms"><div class="rank-pos">${icon}</div><div class="rank-name">${entry.nome || entry.name}</div><div class="rank-lvl">${metricText}</div></div>`;
             });
         }
 
