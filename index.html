@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
     <title>Speedanglo - Ranking & Temas</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -105,6 +105,11 @@
 
         .name-input { width: 100%; padding: 12px; border-radius: 8px; border: 2px solid var(--primary); background: var(--bg-color); color: var(--text-color); font-size: 1.1rem; text-align: center; margin-bottom: 10px; outline: none; }
         .name-input:focus { box-shadow: var(--primary-glow); }
+        .name-input, .native-input { -webkit-user-select: text; user-select: text; }
+
+        /* CAMPO NUMÉRICO NATIVO (só aparece em celular/tablet): invisível, cobre o cartão da conta e abre o teclado só de números */
+        .native-input { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; border: 0; outline: none; background: transparent; color: transparent; -webkit-text-fill-color: transparent; caret-color: transparent; font-size: 16px; z-index: 5; border-radius: 20px; }
+        .touch-submit { display: none; }
 
         .ranking-container { width: 100%; max-width: 380px; background: var(--panel-bg); border-radius: 10px; padding: 5px; border: 1px solid var(--border-color); margin-bottom: 15px; min-height: 250px; max-height: 350px; overflow-y: auto; box-shadow: 0 4px 10px var(--shadow-base); }
         .ranking-item { display: flex; justify-content: space-between; padding: 12px 15px; border-bottom: 1px solid var(--border-color); align-items: center; }
@@ -217,6 +222,7 @@
         <div id="question-card" class="question-card">
             <div id="question-display" class="question">12 + 15</div>
             <div id="input-display" class="input-display"></div>
+            <input id="native-input" class="native-input" type="text" inputmode="decimal" pattern="[0-9]*[,.]?[0-9]*" enterkeyhint="done" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Sua resposta">
         </div>
 
         <div id="options-container" class="options-grid" style="display: none;"></div>
@@ -229,6 +235,8 @@
             <div class="key key-action" onclick="inputDel()">DEL</div>
             <div class="key key-action key-enter" onclick="submitAnswer()">ENTER</div>
         </div>
+
+        <button id="touch-submit" class="btn touch-submit" onmousedown="event.preventDefault()" onclick="submitAnswer(); focusNativeInput();">ENVIAR</button>
 
         <button id="btn-cheat-auto" class="btn-cheat" onclick="autoSolve()">⚡ AUTO-ACERTAR</button>
     </div>
@@ -320,8 +328,34 @@
             isPlaying: false, currentMode: 'teclado', level: 1, score: 0, 
             questionTime: 15, totalTimerLimit: 15, currentQuestion: null, currentInput: "", 
             lastFrameTime: 0, animationReq: null, streak: 0, questionStartTime: 0,
-            cheatMode: false, typedKeysBuffer: "", currentLeaderboard: [] 
+            cheatMode: false, typedKeysBuffer: "", currentLeaderboard: [], deadline: 0
         };
+
+        // ===== CELULAR: TECLADO NUMÉRICO NATIVO =====
+        const IS_TOUCH = window.matchMedia('(pointer: coarse)').matches;
+        const nativeInput = document.getElementById('native-input');
+
+        function focusNativeInput() {
+            if (IS_TOUCH && state.isPlaying && state.currentMode !== 'multipla') { try { nativeInput.focus({ preventScroll: true }); } catch (e) { nativeInput.focus(); } }
+        }
+        function blurNativeInput() { if (nativeInput) nativeInput.blur(); }
+
+        nativeInput.addEventListener('input', () => {
+            let v = nativeInput.value.replace(/\./g, ',').replace(/[^0-9,]/g, '');
+            const first = v.indexOf(',');
+            if (first !== -1) v = v.slice(0, first + 1) + v.slice(first + 1).replace(/,/g, '');
+            state.currentInput = v.slice(0, 8);
+            updateDisplay();
+        });
+        // Tocar em qualquer lugar do jogo (fora de botões) mantém o teclado aberto
+        document.getElementById('game-screen').addEventListener('click', (e) => { if (!e.target.closest('button')) focusNativeInput(); });
+
+        // Mantém o layout do tamanho da área visível quando o teclado do celular abre (iOS/Android)
+        if (IS_TOUCH && window.visualViewport) {
+            const fitViewport = () => { document.body.style.height = window.visualViewport.height + 'px'; window.scrollTo(0, 0); };
+            window.visualViewport.addEventListener('resize', fitViewport);
+            window.visualViewport.addEventListener('scroll', fitViewport);
+        }
 
         const AudioSys = {
             ctx: null,
@@ -503,22 +537,28 @@
         function startMode(mode) {
             state.currentMode = mode; state.isPlaying = true; state.level = 1; state.score = 0; state.streak = 0; state.lastFrameTime = 0;
             if (mode === '60s') { state.totalTimerLimit = TIME_SPRINT; state.questionTime = TIME_SPRINT; } else { state.totalTimerLimit = TIME_QUESTION; state.questionTime = TIME_QUESTION; }
+            state.deadline = Date.now() + state.questionTime * 1000; // prazo em horário real (continua contando mesmo com o PC suspenso)
+            const useNativeKb = IS_TOUCH && mode !== 'multipla';
             document.getElementById('options-container').style.display = mode === 'multipla' ? 'grid' : 'none';
-            document.getElementById('keypad-container').style.display = mode === 'multipla' ? 'none' : 'grid';
+            document.getElementById('keypad-container').style.display = (mode === 'multipla' || IS_TOUCH) ? 'none' : 'grid';
             document.getElementById('input-display').style.display = mode === 'multipla' ? 'none' : 'block';
+            nativeInput.style.display = useNativeKb ? 'block' : 'none';
+            document.getElementById('touch-submit').style.display = useNativeKb ? 'block' : 'none';
+            nativeInput.value = '';
             document.getElementById('streak-display').style.display = 'none';
             document.getElementById('target-display').style.display = 'none';
             
             updateCheatVisibility();
             fetchLeaderboardForGame(mode);
             showScreen('game-screen'); MusicSys.start(); nextQuestion();
+            focusNativeInput(); // precisa rodar dentro do clique para o teclado abrir no celular
             if (state.animationReq) cancelAnimationFrame(state.animationReq); state.animationReq = requestAnimationFrame(gameLoop);
         }
         
-        function abortGame() { state.isPlaying = false; MusicSys.stop(); if (state.animationReq) cancelAnimationFrame(state.animationReq); showScreen('menu-screen'); }
+        function abortGame() { state.isPlaying = false; blurNativeInput(); MusicSys.stop(); if (state.animationReq) cancelAnimationFrame(state.animationReq); showScreen('menu-screen'); }
 
         function nextQuestion() {
-            if (state.currentMode !== '60s') state.questionTime = state.totalTimerLimit; 
+            if (state.currentMode !== '60s') { state.questionTime = state.totalTimerLimit; state.deadline = Date.now() + state.totalTimerLimit * 1000; } 
             state.questionStartTime = Date.now(); MusicSys.setLevel(state.level);
             state.currentQuestion = generateQuestion(); state.currentInput = "";
             document.getElementById('question-display').textContent = state.currentQuestion.text; replay(document.getElementById('question-card'), 'q-in');
@@ -576,6 +616,7 @@
             if (!state.isPlaying) return;
             if (state.cheatMode && e.key.toLowerCase() === 'h') { autoSolve(); return; }
             if (state.currentMode === 'multipla') return;
+            if (e.target === nativeInput) { if (e.key === 'Enter') { e.preventDefault(); submitAnswer(); } return; } // o próprio campo já recebe os dígitos
             if ((e.key >= '0' && e.key <= '9') || e.key === '.' || e.key === ',') inputChar(e.key === '.' ? ',' : e.key);
             else if (e.key === 'Backspace') inputDel(); else if (e.key === 'Enter') submitAnswer();
         });
@@ -608,6 +649,7 @@
 
         function updateDisplay() {
             document.getElementById('input-display').textContent = state.currentInput;
+            if (nativeInput.value !== state.currentInput) nativeInput.value = state.currentInput;
             if (state.currentMode === '60s') { document.getElementById('level-display').textContent = `✅ ${state.level - 1}`; document.getElementById('streak-display').style.display = state.streak >= 10 ? 'block' : 'none'; } else { document.getElementById('level-display').textContent = `🚩 LVL ${state.level}`; document.getElementById('streak-display').style.display = 'none'; }
             document.getElementById('score-display').textContent = `⭐ ${state.score}`;
             const pct = Math.max(0, (state.questionTime / state.totalTimerLimit) * 100); const timerBar = document.getElementById('timer-bar'); timerBar.style.width = `${pct}%`; timerBar.classList.toggle('danger', state.questionTime <= (state.currentMode === '60s' ? 5 : 3));
@@ -615,10 +657,20 @@
             updateTargetDisplay();
         }
 
-        function gameLoop(timestamp) { if (!state.isPlaying) return; if (!state.lastFrameTime) state.lastFrameTime = timestamp; const dt = (timestamp - state.lastFrameTime) / 1000; state.lastFrameTime = timestamp; state.questionTime -= dt; if (state.questionTime <= 0) { state.questionTime = 0; endGame('Tempo Esgotado!'); } else { updateDisplay(); updateParticles(); state.animationReq = requestAnimationFrame(gameLoop); } }
+        // O tempo agora vem do relógio real (Date.now), não da soma dos frames: continua correndo com o PC suspenso, aba em segundo plano ou tela do celular apagada.
+        function checkTimeout() {
+            if (!state.isPlaying) return;
+            state.questionTime = (state.deadline - Date.now()) / 1000;
+            if (state.questionTime <= 0) { state.questionTime = 0; endGame('Tempo Esgotado!'); }
+        }
+        function gameLoop() { if (!state.isPlaying) return; checkTimeout(); if (!state.isPlaying) return; updateDisplay(); updateParticles(); state.animationReq = requestAnimationFrame(gameLoop); }
+        setInterval(checkTimeout, 250); // garante o fim do jogo mesmo quando o navegador pausa as animações
+        document.addEventListener('visibilitychange', checkTimeout);
+        window.addEventListener('focus', checkTimeout);
+        window.addEventListener('pageshow', checkTimeout);
 
         function endGame(reason) {
-            state.isPlaying = false; MusicSys.stop(); AudioSys.gameOver();
+            state.isPlaying = false; blurNativeInput(); MusicSys.stop(); AudioSys.gameOver();
             document.getElementById('label-final-level').textContent = state.currentMode === '60s' ? "ACERTOS" : "SEU LEVEL"; document.getElementById('final-level').textContent = state.currentMode === '60s' ? state.level - 1 : state.level; document.getElementById('final-score').textContent = state.score; document.getElementById('final-equation').textContent = `${state.currentQuestion.text} = ${String(state.currentQuestion.answer).replace('.', ',')}`;
             
             const isRankingEligible = (state.currentMode === '60s' && state.score > 800) || (state.currentMode !== '60s' && state.level > 10);
