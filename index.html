@@ -70,6 +70,10 @@
         .btn-orange { border-color: var(--orange); } .btn-orange:hover { background-color: var(--orange); box-shadow: var(--orange-glow); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
+        .hack-indicator { display: none; background: rgba(34, 197, 94, 0.2); color: var(--correct); font-weight: bold; font-size: 0.8rem; text-align: center; border: 1px dashed var(--correct); padding: 4px; border-radius: 6px; width: 100%; margin-bottom: 5px; animation: pulse 1s infinite; }
+        .btn-cheat { background-color: rgba(34, 197, 94, 0.15) !important; color: var(--correct) !important; border: 2px solid var(--correct) !important; width: 100%; max-width: 320px; margin-top: 10px; font-weight: bold; font-size: 1.1rem; padding: 12px; border-radius: 10px; cursor: pointer; display: none; box-shadow: 0 0 10px rgba(34, 197, 94, 0.4); }
+        .btn-cheat:hover { background-color: var(--correct) !important; color: #fff !important; }
+
         .game-header { display: flex; justify-content: space-between; align-items: center; width: 100%; font-size: 0.9rem; font-weight: bold; margin-bottom: 5px; background: var(--header-bg); padding: 12px 15px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 4px 10px var(--shadow-base); margin-top: 15px;}
         .timer-container { flex-grow: 1; height: 24px; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px; margin: 0 10px; overflow: hidden; position: relative; }
         .timer-bar { height: 100%; width: 100%; background: var(--primary); border-radius: 10px; transition: width 0.1s linear, background-color 0.3s; }
@@ -103,6 +107,7 @@
         .name-input:focus { box-shadow: var(--primary-glow); }
         .name-input, .native-input { -webkit-user-select: text; user-select: text; }
 
+        /* CAMPO NUMÉRICO NATIVO (só aparece em celular/tablet): invisível, cobre o cartão da conta e abre o teclado só de números */
         .native-input { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; border: 0; outline: none; background: transparent; color: transparent; -webkit-text-fill-color: transparent; caret-color: transparent; font-size: 16px; z-index: 5; border-radius: 20px; }
         .touch-submit { display: none; }
 
@@ -128,6 +133,7 @@
         .correct-flash { border-color: var(--correct); }
         .wrong-flash { border-color: var(--wrong); }
 
+        /* ===== ANIMAÇÕES: curtas, só transform/opacity, nunca bloqueiam o input ===== */
         :root { --ease: cubic-bezier(.22,1,.36,1); }
         body::before, body::after { content:""; position:absolute; width:60vmax; height:60vmax; border-radius:50%; opacity:.16; pointer-events:none; z-index:0; will-change:transform; }
         body::before { background:radial-gradient(circle,var(--primary),transparent 65%); top:-25vmax; left:-20vmax; animation:drift1 26s ease-in-out infinite alternate; }
@@ -202,6 +208,7 @@
     <div id="game-screen" class="screen">
         <button class="close-btn" onclick="abortGame()" title="Sair para o Menu">✖</button>
         
+        <div id="hack-banner" class="hack-indicator">⚠️ MODO CHEAT ATIVO ⚠️</div>
         <div id="streak-display" class="streak-badge">🔥 STREAK BÔNUS ATIVO 🔥</div>
         
         <div class="game-header">
@@ -230,6 +237,8 @@
         </div>
 
         <button id="touch-submit" class="btn touch-submit" onmousedown="event.preventDefault()" onclick="submitAnswer(); focusNativeInput();">ENVIAR</button>
+
+        <button id="btn-cheat-auto" class="btn-cheat" onclick="autoSolve()">⚡ AUTO-ACERTAR</button>
     </div>
 
     <!-- FIM DE JOGO -->
@@ -266,40 +275,8 @@
     </div>
 
     <script>
-        // ==========================================
-        // MECANISMO ANTI-INSPECIONAR / DEVTOOLS
-        // ==========================================
-        
-        // 1. Desativa o menu de contexto (botão direito do mouse)
-        document.addEventListener('contextmenu', e => e.preventDefault());
-
-        // 2. Bloqueia atalhos de teclado para ferramentas de desenvolvedor
-        document.addEventListener('keydown', (e) => {
-            if (
-                e.key === 'F12' ||
-                (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) ||
-                (e.ctrlKey && (e.key === 'U' || e.key === 'u'))
-            ) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-        });
-
-        // 3. Loop de detecção via debugger (reinicia a página caso o DevTools seja forçado)
-        setInterval(() => {
-            const startTime = performance.now();
-            debugger;
-            if (performance.now() - startTime > 100) {
-                window.location.reload();
-            }
-        }, 1000);
-
-        // ==========================================
-        // LÓGICA PRINCIPAL DO JOGO
-        // ==========================================
-
         (function () { const h = document.querySelector('#menu-screen h1'); const t = h.textContent; h.setAttribute('aria-label', t); h.innerHTML = [...t].map((c, i) => `<span class="ch" aria-hidden="true" style="animation-delay:${i * 60}ms">${c}</span>`).join(''); })();
-        
+        // TELA CHEIA
         function requestFullscreenSafe() {
             const el = document.documentElement;
             const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
@@ -351,9 +328,10 @@
             isPlaying: false, currentMode: 'teclado', level: 1, score: 0, 
             questionTime: 15, totalTimerLimit: 15, currentQuestion: null, currentInput: "", 
             lastFrameTime: 0, animationReq: null, streak: 0, questionStartTime: 0,
-            currentLeaderboard: [], deadline: 0
+            cheatMode: false, typedKeysBuffer: "", currentLeaderboard: [], deadline: 0
         };
 
+        // ===== CELULAR: TECLADO NUMÉRICO NATIVO =====
         const IS_TOUCH = window.matchMedia('(pointer: coarse)').matches;
         const nativeInput = document.getElementById('native-input');
 
@@ -369,9 +347,10 @@
             state.currentInput = v.slice(0, 8);
             updateDisplay();
         });
-        
+        // Tocar em qualquer lugar do jogo (fora de botões) mantém o teclado aberto
         document.getElementById('game-screen').addEventListener('click', (e) => { if (!e.target.closest('button')) focusNativeInput(); });
 
+        // Mantém o layout do tamanho da área visível quando o teclado do celular abre (iOS/Android)
         if (IS_TOUCH && window.visualViewport) {
             const fitViewport = () => { document.body.style.height = window.visualViewport.height + 'px'; window.scrollTo(0, 0); };
             window.visualViewport.addEventListener('resize', fitViewport);
@@ -431,13 +410,16 @@
             const extraHighLevel = (!isMode60 && lvl >= DIFF.highLevelGrowthFrom) ? Math.floor((lvl - DIFF.highLevelGrowthFrom) * DIFF.highLevelGrowth) : 0; 
             const maxNum = DIFF.baseMax + (group * DIFF.maxGrowth) + extraHighLevel; 
             
+            // 1. REGRAS DE PORCENTAGEM POR NÍVEL
             let allowDecimals = false;
             if (lvl > 50) {
-                allowDecimals = Math.random() < 0.15;
+                allowDecimals = Math.random() < 0.15; // Nível > 50: 15% de probabilidade
             } else if (lvl >= 45) {
-                allowDecimals = Math.random() < 0.10;
+                allowDecimals = Math.random() < 0.10; // Nível 45 a 50: 10% de probabilidade
             }
+            // Abaixo do nível 45 permanece false (0%)
             
+            // 2. DECIMAIS AMIGÁVEIS (Apenas aplicados à soma e subtração)
             const genDecs = [0.2, 0.25, 0.4, 0.5, 0.75, 0.8];
 
             let op; const r = Math.random();
@@ -447,6 +429,7 @@
                 if (r < DIFF.opMul) op = '*'; else if (r < DIFF.opMul + DIFF.opDiv) op = '/'; else if (r < DIFF.opMul + DIFF.opDiv + DIFF.opAdd) op = '+'; else op = '-'; 
             }
             
+            // 3. GERADOR DE NÚMEROS (forceInt = true bloqueia decimais)
             function getNum(forceInt = false) { 
                 if (allowDecimals && !forceInt) { 
                     const intPart = Math.floor(Math.random() * maxNum) + 1;
@@ -459,6 +442,7 @@
             let a, b, ans;
             
             if (op === '/') { 
+                // DIVISÃO: Divisor e Resultado são forçados a serem inteiros
                 b = getNum(true); 
                 ans = getNum(true); 
                 a = Math.round((ans * b) * 100) / 100;
@@ -468,6 +452,7 @@
                     a = Math.round((ans * b) * 100) / 100;
                 }
             } else if (op === '*') { 
+                // MULTIPLICAÇÃO: Fatores são gerados apenas como inteiros
                 let minFactor = 2; 
                 if (!isMode60 && lvl >= 10) minFactor = Math.min(7, 2 + Math.floor((lvl - 10) / 7)); 
                 const range = DIFF.mulBase + group * DIFF.mulGrowth + (!isMode60 && lvl >= 10 ? Math.floor((lvl - 10) * 0.3) : 0); 
@@ -476,10 +461,12 @@
                 
                 ans = Math.round((a * b) * 100) / 100; 
             } else if (op === '-') { 
+                // SUBTRAÇÃO: Pode receber decimais se allowDecimals for true
                 a = getNum(); b = getNum(); 
                 if (a < b) [a, b] = [b, a]; 
                 ans = Math.round((a - b) * 100) / 100; 
             } else { 
+                // SOMA (+): Pode receber decimais se allowDecimals for true
                 a = getNum(); b = getNum(); 
                 ans = Math.round((a + b) * 100) / 100; 
             }
@@ -489,6 +476,7 @@
             let c = null; let op2 = null;
             
             if (threeTerms) { 
+                // O terceiro termo é sempre + ou -, permitindo decimais apenas nesta etapa subtrativa/aditiva
                 c = getNum(); 
                 op2 = Math.random() < 0.5 ? '+' : '-'; 
                 if (op2 === '-' && ans < c) op2 = '+'; 
@@ -545,11 +533,11 @@
             } catch (e) { console.error("Erro ao buscar alvos:", e); }
         }
 
-        const TIME_QUESTION = 15, TIME_SPRINT = 60;
+        const TIME_QUESTION = 15, TIME_SPRINT = 60; // segundos: por pergunta (teclado/múltipla) e duração do modo sprint
         function startMode(mode) {
             state.currentMode = mode; state.isPlaying = true; state.level = 1; state.score = 0; state.streak = 0; state.lastFrameTime = 0;
             if (mode === '60s') { state.totalTimerLimit = TIME_SPRINT; state.questionTime = TIME_SPRINT; } else { state.totalTimerLimit = TIME_QUESTION; state.questionTime = TIME_QUESTION; }
-            state.deadline = Date.now() + state.questionTime * 1000;
+            state.deadline = Date.now() + state.questionTime * 1000; // prazo em horário real (continua contando mesmo com o PC suspenso)
             const useNativeKb = IS_TOUCH && mode !== 'multipla';
             document.getElementById('options-container').style.display = mode === 'multipla' ? 'grid' : 'none';
             document.getElementById('keypad-container').style.display = (mode === 'multipla' || IS_TOUCH) ? 'none' : 'grid';
@@ -560,9 +548,10 @@
             document.getElementById('streak-display').style.display = 'none';
             document.getElementById('target-display').style.display = 'none';
             
+            updateCheatVisibility();
             fetchLeaderboardForGame(mode);
             showScreen('game-screen'); MusicSys.start(); nextQuestion();
-            focusNativeInput();
+            focusNativeInput(); // precisa rodar dentro do clique para o teclado abrir no celular
             if (state.animationReq) cancelAnimationFrame(state.animationReq); state.animationReq = requestAnimationFrame(gameLoop);
         }
         
@@ -584,7 +573,6 @@
         function bump(id) { replay(document.getElementById(id), 'bump'); }
         function spawnAtCard(color) { const r = document.getElementById('question-card').getBoundingClientRect(); spawnParticles(r.left + r.width / 2, r.top + r.height / 2, color); }
         function floatText(text, color) { const r = document.getElementById('question-card').getBoundingClientRect(); const d = document.createElement('div'); d.className = 'float-pop'; d.textContent = text; d.style.color = color; d.style.left = (r.left + r.width / 2) + 'px'; d.style.top = (r.top + 6) + 'px'; d.addEventListener('animationend', () => d.remove()); document.body.appendChild(d); }
-        
         function checkAnswer(userAns) {
             if (!state.isPlaying) return;
             const parsedAns = parseFloat(String(userAns).replace(',', '.'));
@@ -610,6 +598,8 @@
             }
         }
 
+        function autoSolve() { if (!state.isPlaying || !state.currentQuestion) return; const correctStr = String(state.currentQuestion.answer).replace('.', ','); if (state.currentMode === 'multipla') { checkAnswer(state.currentQuestion.answer); } else { state.currentInput = correctStr; submitAnswer(); } }
+        function updateCheatVisibility() { const cheatBtn = document.getElementById('btn-cheat-auto'); const cheatBanner = document.getElementById('hack-banner'); if (state.cheatMode) { cheatBtn.style.display = 'block'; cheatBanner.style.display = 'block'; } else { cheatBtn.style.display = 'none'; cheatBanner.style.display = 'none'; } }
         function submitAnswer() { if (state.currentInput === "") return; checkAnswer(state.currentInput); }
         function inputChar(c) { if (c === '.') c = ','; if (c === ',' && state.currentInput.includes(',')) return; if (state.currentInput.length < 8) { state.currentInput += c; updateDisplay(); } }
         function inputDel() { state.currentInput = state.currentInput.slice(0, -1); updateDisplay(); }
@@ -617,14 +607,16 @@
         window.addEventListener('keydown', (e) => {
             if ((e.key === 'm' || e.key === 'M') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && e.target.tagName !== 'INPUT') toggleMusic();
             if ((e.key === 'f' || e.key === 'F') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && e.target.tagName !== 'INPUT') { toggleFullscreen(); closeFullscreenModal(); }
-            
+            state.typedKeysBuffer += e.key.toLowerCase(); if (state.typedKeysBuffer.length > 10) { state.typedKeysBuffer = state.typedKeysBuffer.slice(-10); }
+            if (state.typedKeysBuffer.endsWith('hack')) { state.cheatMode = false; updateCheatVisibility(); AudioSys.record(); }
             const gameOverScreen = document.getElementById('game-over-screen');
             if (gameOverScreen && gameOverScreen.classList.contains('active-screen')) {
                 if (e.key === 'Enter') { const nameInput = document.getElementById('player-name'); const rankingSection = document.getElementById('ranking-input-section'); if (document.activeElement === nameInput && rankingSection && rankingSection.style.display !== 'none') { submitRankingName(); } else { startMode(state.currentMode); } return; }
             }
             if (!state.isPlaying) return;
+            if (state.cheatMode && e.key.toLowerCase() === 'h') { autoSolve(); return; }
             if (state.currentMode === 'multipla') return;
-            if (e.target === nativeInput) { if (e.key === 'Enter') { e.preventDefault(); submitAnswer(); } return; }
+            if (e.target === nativeInput) { if (e.key === 'Enter') { e.preventDefault(); submitAnswer(); } return; } // o próprio campo já recebe os dígitos
             if ((e.key >= '0' && e.key <= '9') || e.key === '.' || e.key === ',') inputChar(e.key === '.' ? ',' : e.key);
             else if (e.key === 'Backspace') inputDel(); else if (e.key === 'Enter') submitAnswer();
         });
@@ -665,13 +657,14 @@
             updateTargetDisplay();
         }
 
+        // O tempo agora vem do relógio real (Date.now), não da soma dos frames: continua correndo com o PC suspenso, aba em segundo plano ou tela do celular apagada.
         function checkTimeout() {
             if (!state.isPlaying) return;
             state.questionTime = (state.deadline - Date.now()) / 1000;
             if (state.questionTime <= 0) { state.questionTime = 0; endGame('Tempo Esgotado!'); }
         }
         function gameLoop() { if (!state.isPlaying) return; checkTimeout(); if (!state.isPlaying) return; updateDisplay(); updateParticles(); state.animationReq = requestAnimationFrame(gameLoop); }
-        setInterval(checkTimeout, 250);
+        setInterval(checkTimeout, 250); // garante o fim do jogo mesmo quando o navegador pausa as animações
         document.addEventListener('visibilitychange', checkTimeout);
         window.addEventListener('focus', checkTimeout);
         window.addEventListener('pageshow', checkTimeout);
@@ -716,6 +709,7 @@
                         const { error } = await sb.rpc('salvar_maior_score', { p_nome: rawName, p_score: state.level, p_modo: state.currentMode }); err = error;
                     }
 
+                    // FALLBACK: Usar upsert direto caso a função RPC por algum motivo falhe
                     if (err) {
                         console.warn("RPC falhou, executando upsert...", err);
                         if (state.currentMode === '60s') {
