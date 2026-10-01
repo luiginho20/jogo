@@ -174,6 +174,18 @@
         #menu-screen.active-screen > h1 { animation:none; }
         .ch { display:inline-block; animation:ch-in .75s var(--ease) backwards; }
         @keyframes ch-in { from { opacity:0; transform:translateY(-26px) scale(.6) rotate(-10deg); filter:blur(5px); } }
+        /* BOTÃO DE DÚVIDA (ranking) + POP-UP DE REGRAS */
+        .help-btn { position: fixed; top: 20px; left: 20px; background: var(--panel-bg); border: 2px solid var(--border-color); color: var(--primary); font-size: 1.25rem; font-weight: bold; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; z-index: 100; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px var(--shadow-base); transition: all 0.3s; }
+        .help-btn:hover { transform: scale(1.1); border-color: var(--primary); box-shadow: var(--primary-glow); }
+        .rules-modal { max-width: 340px; text-align: left; }
+        .rules-modal h3 { text-align: center; margin-bottom: 14px; }
+        .rules-list { list-style: none; margin-bottom: 18px; }
+        .rules-list li { display: flex; gap: 10px; align-items: flex-start; font-size: 0.88rem; line-height: 1.4; color: var(--text-color); margin-bottom: 10px; }
+        .rules-list .ri { font-size: 1.2rem; line-height: 1.2; }
+        .rules-list b { color: var(--primary); }
+        .name-error { border-color: var(--wrong) !important; animation: shake .32s; }
+        .btn:disabled:hover { background-color: var(--panel-bg); color: var(--text-color); }
+
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; } }
     </style>
 </head>
@@ -194,6 +206,21 @@
         </div>
     </div>
 
+    <!-- POP-UP REGRAS DO RANKING -->
+    <div id="rules-overlay" class="fullscreen-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="rules-title">
+        <div class="fullscreen-modal rules-modal">
+            <div class="fs-icon">🏆</div>
+            <h3 id="rules-title">Como funciona o ranking</h3>
+            <ul class="rules-list">
+                <li><span class="ri">🎯</span><span><b>Como entrar:</b> passe do nível 10 (ou faça mais de 800 pontos no modo 60s) e fique entre os 15 melhores.</span></li>
+                <li><span class="ri">✍️</span><span><b>Nome obrigatório:</b> sem nome não dá para salvar (até 12 caracteres).</span></li>
+                <li><span class="ri">🔁</span><span><b>Use sempre o mesmo nome:</b> assim o seu recorde é atualizado (Ana e ana contam como o mesmo). Só o seu melhor resultado fica.</span></li>
+                <li><span class="ri">📋</span><span>Cada modo tem o seu ranking e só o top 15 aparece.</span></li>
+            </ul>
+            <button class="btn" onclick="closeRankingRules()">ENTENDI</button>
+        </div>
+    </div>
+
     <!-- MENU -->
     <div id="menu-screen" class="screen active-screen">
         <h1>SPEEDANGLO</h1>
@@ -201,7 +228,7 @@
         <button class="btn" onclick="startMode('teclado')"><span class="emo">⌨</span> TECLADO<span class="btn-sub">(SOBREVIVÊNCIA)</span></button>
         <button class="btn btn-purple" onclick="startMode('multipla')"><span class="emo">🎯</span> MÚLTIPLA ESCOLHA</button>
         <button class="btn btn-orange" onclick="startMode('60s')"><span class="emo">⏱</span> 60 SEGUNDOS<span class="btn-sub">(MAX SCORE)</span></button>
-        <button class="btn" style="background: transparent; border-color: var(--subtitle-color);" onclick="openRankingScreen()"><span class="emo">🏆</span> RANKING GLOBAL</button>
+        <button class="btn" style="background: transparent; border-color: var(--subtitle-color);" onclick="openRankingFromMenu()"><span class="emo">🏆</span> RANKING GLOBAL</button>
     </div>
 
     <!-- JOGO -->
@@ -253,17 +280,18 @@
         <div id="ranking-input-section" style="display: none; width: 100%; max-width: 380px; margin-bottom: 15px; background: var(--gold-bg); padding: 15px; border-radius: 10px; border: 1px solid var(--gold);">
             <h3 style="color: var(--gold); margin-bottom: 10px; font-size: 1.1rem; text-align: center;">🎉 VOCÊ ENTROU PRO RANKING!</h3>
             <p style="font-size: 0.85rem; text-align: center; margin-bottom: 10px; color: var(--subtitle-color);">Salve seu nome e eternize seu placar!</p>
-            <input type="text" id="player-name" class="name-input" placeholder="Digite seu nome (Máx 12)" maxlength="12" autocomplete="off">
+            <input type="text" id="player-name" class="name-input" placeholder="Digite seu nome (obrigatório, máx 12)" maxlength="12" autocomplete="off">
             <button id="btn-save-ranking" class="btn" style="border-color: var(--gold); color: var(--gold); width: 100%;" onclick="submitRankingName()">SALVAR NO RANKING</button>
             <p id="ranking-msg" style="font-size: 0.8rem; text-align: center; margin-top: 5px; color: var(--primary); display: none;"></p>
         </div>
 
-        <button class="btn" onclick="startMode(state.currentMode)">JOGAR NOVAMENTE</button>
+        <button id="btn-play-again" class="btn" onclick="playAgain()">JOGAR NOVAMENTE</button>
         <button class="btn" style="background: transparent; border-color: var(--subtitle-color); color: var(--text-color)" onclick="showScreen('menu-screen')">MENU PRINCIPAL</button>
     </div>
 
     <!-- RANKING -->
     <div id="records-screen" class="screen">
+        <button class="help-btn" onclick="openRankingRules()" title="Dúvidas sobre o ranking" aria-label="Dúvidas sobre o ranking">?</button>
         <h1><span class="emo">🏆</span> RANKING</h1>
         <div class="tabs">
             <button id="tab-teclado" class="tab-btn active" onclick="openRankingScreen('teclado')">⌨ TECLADO</button>
@@ -324,6 +352,50 @@
         }
 
         let localRecords = { rankingTeclado: [], rankingMultipla: [], ranking60s: [] };
+
+        const RANKING_LIMIT = 15;          // só o top 15 de cada modo
+        const PLAY_AGAIN_FROM_LEVEL = 10;  // depois do nível 10...
+        const PLAY_AGAIN_WAIT = 3;         // ...o "jogar novamente" espera 3 segundos
+        const RULES_KEY = 'speedangloRankingRulesSeen';
+        function escapeHtml(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+        // ===== JOGAR NOVAMENTE: depois do nível 10 espera 3 segundos (evita pular a tela de fim de jogo sem querer) =====
+        let playAgainTimer = null, playAgainLocked = false;
+        function unlockPlayAgain() {
+            clearInterval(playAgainTimer); playAgainTimer = null; playAgainLocked = false;
+            const btn = document.getElementById('btn-play-again'); if (btn) { btn.disabled = false; btn.textContent = 'JOGAR NOVAMENTE'; }
+        }
+        function lockPlayAgain(seconds) {
+            const btn = document.getElementById('btn-play-again'); if (!btn) return;
+            clearInterval(playAgainTimer); playAgainLocked = true; btn.disabled = true;
+            const end = Date.now() + seconds * 1000;
+            const tick = () => {
+                const left = Math.ceil((end - Date.now()) / 1000);
+                if (left <= 0) { unlockPlayAgain(); return; }
+                btn.textContent = `JOGAR NOVAMENTE (${left})`;
+            };
+            tick(); playAgainTimer = setInterval(tick, 200);
+        }
+        function playAgain() { if (playAgainLocked) return; startMode(state.currentMode); }
+
+        // ===== REGRAS DO RANKING: o pop-up abre sozinho só na primeira vez; o botão "?" do ranking abre de novo =====
+        function openRankingRules() { document.getElementById('rules-overlay').classList.remove('hidden'); }
+        function closeRankingRules() { document.getElementById('rules-overlay').classList.add('hidden'); try { localStorage.setItem(RULES_KEY, '1'); } catch (e) {} }
+        function openRankingFromMenu() {
+            openRankingScreen();
+            let seen = false; try { seen = localStorage.getItem(RULES_KEY) === '1'; } catch (e) {}
+            if (!seen) openRankingRules();
+        }
+
+        // Entra no ranking quem passa do nível 10 (60s: mais de 800 pts) e, com o top 15 cheio, supera o último colocado
+        function qualifiesForRanking() {
+            const is60 = state.currentMode === '60s';
+            const metric = is60 ? state.score : state.level;
+            if (!(is60 ? state.score > 800 : state.level > 10)) return false;
+            const lb = state.currentLeaderboard;
+            if (lb && lb.length >= RANKING_LIMIT) { const last = lb[lb.length - 1]; if (metric <= (is60 ? last.score : last.level)) return false; }
+            return true;
+        }
         let state = { 
             isPlaying: false, currentMode: 'teclado', level: 1, score: 0, 
             questionTime: 15, totalTimerLimit: 15, currentQuestion: null, currentInput: "", 
@@ -368,24 +440,156 @@
         };
         window.addEventListener('pointerdown', () => AudioSys.init(), { once: true });
 
+        // ===== MÚSICA: começa calma e ganha tensão a cada 10 níveis. Tudo entra devagar (volume e andamento deslizam), sem sustos =====
         const MusicSys = {
-            BPM: 124, VOLUME: 0.42, muted: false, playing: false, comp: null, bus: null, noise: null,
-            timer: null, nextTime: 0, step: 0, intensity: 0, target: 0,
-            CHORDS: [ { bass: 45, tones: [57, 60, 64] }, { bass: 41, tones: [57, 60, 65] }, { bass: 48, tones: [55, 60, 64] }, { bass: 43, tones: [55, 59, 62] }, { bass: 45, tones: [57, 60, 64] }, { bass: 41, tones: [57, 60, 65] }, { bass: 43, tones: [55, 59, 62] }, { bass: 40, tones: [56, 59, 62] } ],
+            VOLUME: 0.4, muted: false, playing: false, comp: null, bus: null, noise: null, nodes: [], echoIn: null, echo: null,
+            timer: null, nextTime: 0, step: 0, tier: 0, targetTier: 0, bpm: 84, lv: null,
+            LAYERS: ['pad', 'bass', 'arp', 'kick', 'hat', 'snare', 'drone', 'riser'],
+            // Faixa 0 = níveis 1-10, faixa 1 = 11-20, ... faixa 6 = 61+. Cada número é o volume da camada naquela faixa.
+            TIERS: [
+                { bpm: 84,  pad: 1,    bass: 0.55, arp: 0.3,  kick: 0,   hat: 0,    snare: 0,   drone: 0,   riser: 0 },
+                { bpm: 88,  pad: 1,    bass: 0.8,  arp: 0.6,  kick: 0,   hat: 0,    snare: 0,   drone: 0,   riser: 0 },
+                { bpm: 94,  pad: 0.95, bass: 0.9,  arp: 0.75, kick: 0.5, hat: 0.35, snare: 0,   drone: 0,   riser: 0 },
+                { bpm: 100, pad: 0.9,  bass: 1,    arp: 0.85, kick: 0.8, hat: 0.6,  snare: 0,   drone: 0,   riser: 0 },
+                { bpm: 106, pad: 0.85, bass: 1,    arp: 0.95, kick: 0.9, hat: 0.8,  snare: 0.5, drone: 0.5, riser: 0 },
+                { bpm: 112, pad: 0.8,  bass: 1,    arp: 1,    kick: 1,   hat: 0.9,  snare: 0.8, drone: 0.8, riser: 0.6 },
+                { bpm: 118, pad: 0.8,  bass: 1,    arp: 1,    kick: 1,   hat: 1,    snare: 1,   drone: 1,   riser: 1 }
+            ],
+            ARP_EVERY: [8, 4, 4, 4, 2, 2, 1], // de quantos em quantos passos (1/16) o arpejo toca em cada faixa
+            CHORDS: [
+                { bass: 45, tones: [57, 60, 64] }, // Am
+                { bass: 41, tones: [57, 60, 65] }, // F
+                { bass: 48, tones: [55, 60, 64] }, // C
+                { bass: 43, tones: [55, 59, 62] }, // G
+                { bass: 45, tones: [57, 60, 64] }, // Am
+                { bass: 41, tones: [57, 60, 65] }, // F
+                { bass: 38, tones: [57, 62, 65] }, // Dm
+                { bass: 40, tones: [56, 59, 64] }  // E
+            ],
             BASS_PATTERN: [0, 0, 12, 0, 0, 12, 0, 7],
-            LEAD: [ [[0,76,3],[3,72,3],[6,76,2],[8,81,4],[12,79,2],[14,76,2]], [[0,77,3],[3,72,3],[6,77,2],[8,81,4],[12,77,2],[14,74,2]], [[0,76,3],[3,79,3],[6,76,2],[8,72,4],[12,76,2],[14,79,2]], [[0,74,3],[3,79,3],[6,74,2],[8,71,4],[12,74,2],[14,79,2]], [[0,81,3],[3,76,3],[6,81,2],[8,79,4],[12,76,2],[14,72,2]], [[0,81,3],[3,77,3],[6,81,2],[8,77,4],[12,74,2],[14,72,2]], [[0,79,3],[3,74,3],[6,79,2],[8,83,4],[12,79,2],[14,74,2]], [[0,80,3],[3,76,3],[6,80,2],[8,83,4],[12,80,2],[14,74,2]] ],
+            ARP_SEQ: [0, 1, 2, 3, 2, 1, 2, 1],
             mtof(n) { return 440 * Math.pow(2, (n - 69) / 12); },
-            voice(type, freq, t, dur, vol, cutoff, atk, rel) { const ctx = AudioSys.ctx; const osc = ctx.createOscillator(); const g = ctx.createGain(); osc.type = type; osc.frequency.setValueAtTime(freq, t); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + atk); g.gain.setValueAtTime(vol, t + Math.max(atk, dur - rel)); g.gain.linearRampToValueAtTime(0.0001, t + dur); if (cutoff) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cutoff; osc.connect(f); f.connect(g); } else { osc.connect(g); } g.connect(this.bus); osc.start(t); osc.stop(t + dur + 0.02); },
-            noiseHit(t, dur, vol, highpass) { const ctx = AudioSys.ctx; const src = ctx.createBufferSource(); src.buffer = this.noise; const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = highpass; const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); src.connect(f); f.connect(g); g.connect(this.bus); src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02); },
-            kick(t, vol) { const ctx = AudioSys.ctx; const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.11); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2); o.connect(g); g.connect(this.bus); o.start(t); o.stop(t + 0.22); },
-            snare(t, vol) { this.noiseHit(t, 0.15, vol, 1400); this.voice('triangle', 185, t, 0.09, vol * 0.6, 0, 0.001, 0.07); },
-            hat(t, vol) { this.noiseHit(t, 0.04, vol, 7000); },
-            playStep(s, t) { const bar = Math.floor(s / 16), i = s % 16; if (i === 0) this.intensity = this.target; if (this.muted) return; const sd = 60 / this.BPM / 4; const lv = this.intensity; const chord = this.CHORDS[bar]; if (lv === 0 ? (i === 0 || i === 8) : (i % 4 === 0)) this.kick(t, i % 8 === 0 ? 0.9 : 0.7); if (lv >= 1) { if (i === 4 || i === 12) this.snare(t, 0.3); if ((bar === 3 || bar === 7) && (i === 14 || i === 15)) this.snare(t, 0.16); } if (i % 4 === 2) this.hat(t, 0.075); else if (lv >= 2 && i % 2 === 1) this.hat(t, 0.03); if (i % 2 === 0) { this.voice('sawtooth', this.mtof(chord.bass + this.BASS_PATTERN[i / 2]), t, sd * 1.8, 0.2, 650, 0.008, 0.06); } if (i === 0) { chord.tones.forEach(n => this.voice('triangle', this.mtof(n), t, sd * 16 + 0.15, 0.05, 1800, 0.08, 0.3)); } if (lv >= 1) { const n = chord.tones[[0, 1, 2, 1][i % 4]] + 12; const v = (lv >= 2 ? 0.026 : 0.038) * (i % 4 === 0 ? 1.3 : 1); this.voice('square', this.mtof(n), t, sd * 0.8, v, 2400, 0.004, 0.04); } if (lv >= 2) { this.LEAD[bar].forEach(([st, n, len]) => { if (st === i) this.voice('square', this.mtof(n), t, sd * len * 0.92, 0.05, 3200, 0.01, 0.06); }); } },
-            setup() { const ctx = AudioSys.ctx; if (!this.comp) { this.comp = ctx.createDynamicsCompressor(); this.comp.threshold.value = -16; this.comp.ratio.value = 4; this.comp.attack.value = 0.005; this.comp.release.value = 0.15; this.comp.connect(ctx.destination); const len = ctx.sampleRate; this.noise = ctx.createBuffer(1, len, ctx.sampleRate); const d = this.noise.getChannelData(0); for (let k = 0; k < len; k++) d[k] = Math.random() * 2 - 1; } this.bus = ctx.createGain(); this.bus.gain.value = this.muted ? 0 : this.VOLUME; this.bus.connect(this.comp); },
-            start() { if (this.playing) return; try { AudioSys.init(); this.setup(); } catch (e) { return; } this.playing = true; this.step = 0; this.intensity = 0; this.target = 0; this.nextTime = AudioSys.ctx.currentTime + 0.08; clearInterval(this.timer); this.timer = setInterval(() => this.tick(), 25); this.tick(); },
-            tick() { const ctx = AudioSys.ctx; if (!ctx || !this.playing) return; if (this.nextTime < ctx.currentTime - 0.05) this.nextTime = ctx.currentTime + 0.05; while (this.nextTime < ctx.currentTime + 0.12) { try { this.playStep(this.step % 128, this.nextTime); } catch (e) {} this.nextTime += 60 / this.BPM / 4; this.step++; } },
-            stop() { if (!this.playing) return; this.playing = false; clearInterval(this.timer); this.timer = null; const bus = this.bus, ctx = AudioSys.ctx; if (bus && ctx) { const t = ctx.currentTime; bus.gain.cancelScheduledValues(t); bus.gain.setValueAtTime(bus.gain.value, t); bus.gain.linearRampToValueAtTime(0, t + 0.4); setTimeout(() => { try { bus.disconnect(); } catch (e) {} }, 600); } },
-            setLevel(lvl) { this.target = lvl >= 16 ? 2 : (lvl >= 6 ? 1 : 0); },
+            voice(type, freq, t, dur, vol, cutoff, atk, rel, send) {
+                if (vol < 0.0005) return;
+                const ctx = AudioSys.ctx; const osc = ctx.createOscillator(); const g = ctx.createGain();
+                osc.type = type; osc.frequency.setValueAtTime(freq, t);
+                g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + atk);
+                g.gain.setValueAtTime(vol, t + Math.max(atk, dur - rel)); g.gain.linearRampToValueAtTime(0.0001, t + dur);
+                let src = osc;
+                if (cutoff) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cutoff; osc.connect(f); src = f; }
+                src.connect(g); g.connect(this.bus); if (send && this.echoIn) g.connect(this.echoIn);
+                osc.start(t); osc.stop(t + dur + 0.02);
+            },
+            noiseHit(t, dur, vol, highpass) {
+                const ctx = AudioSys.ctx; const src = ctx.createBufferSource(); src.buffer = this.noise;
+                const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = highpass;
+                const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+                src.connect(f); f.connect(g); g.connect(this.bus); src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
+            },
+            kick(t, vol) {
+                const ctx = AudioSys.ctx; const o = ctx.createOscillator(), g = ctx.createGain();
+                o.type = 'sine'; o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.13);
+                g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+                o.connect(g); g.connect(this.bus); o.start(t); o.stop(t + 0.26);
+            },
+            snare(t, vol) { this.noiseHit(t, 0.14, vol, 1500); this.voice('triangle', 190, t, 0.08, vol * 0.5, 0, 0.001, 0.06); },
+            hat(t, vol) { this.noiseHit(t, 0.035, vol, 8000); },
+            riser(t, dur, vol) {
+                const ctx = AudioSys.ctx; const src = ctx.createBufferSource(); src.buffer = this.noise; src.loop = true;
+                const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2;
+                f.frequency.setValueAtTime(400, t); f.frequency.exponentialRampToValueAtTime(3500, t + dur);
+                const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + dur * 0.95); g.gain.linearRampToValueAtTime(0.0001, t + dur);
+                src.connect(f); f.connect(g); g.connect(this.bus); src.start(t); src.stop(t + dur + 0.05);
+            },
+            resetLayers() { this.lv = {}; this.LAYERS.forEach(k => { this.lv[k] = this.TIERS[0][k]; }); },
+            playStep(s, t) {
+                const bar = Math.floor(s / 16), i = s % 16;
+                if (i === 0) this.tier = this.targetTier; // a faixa só muda no começo de um compasso
+                const tier = this.tier, cfg = this.TIERS[tier], lv = this.lv;
+                // andamento e volume de cada camada deslizam devagar até o alvo da faixa (nada muda de repente)
+                this.bpm += (cfg.bpm - this.bpm) * 0.012;
+                this.LAYERS.forEach(k => { lv[k] += (cfg[k] - lv[k]) * 0.04; });
+                if (this.muted) return;
+                const sd = 60 / this.bpm / 4, chord = this.CHORDS[bar];
+                if (i === 0 && this.echo) this.echo.delayTime.setTargetAtTime(sd * 3, t, 0.6);
+
+                // PAD: acordes longos e macios, um por compasso
+                if (i === 0) chord.tones.forEach(n => {
+                    const f = this.mtof(n), cut = 900 + tier * 150, d = sd * 16 + 1.2;
+                    this.voice('sine', f, t, d, 0.05 * lv.pad, cut, 1.0, 1.0);
+                    this.voice('triangle', f * 1.004, t, d, 0.022 * lv.pad, cut, 1.0, 1.0);
+                });
+
+                // BAIXO: uma nota por compasso no começo, e vai ficando mais movimentado
+                let bo = -1, bdur = sd * 14;
+                if (tier <= 0) { if (i === 0) bo = 0; }
+                else if (tier <= 2) { bdur = sd * 7; if (i === 0) bo = 0; else if (i === 8) bo = 7; }
+                else if (tier <= 4) { bdur = sd * 3.4; if (i % 4 === 0) bo = [0, 0, 12, 0][i / 4]; }
+                else { bdur = sd * 1.7; if (i % 2 === 0) bo = this.BASS_PATTERN[i / 2]; }
+                if (bo >= 0) {
+                    const f = this.mtof(chord.bass + bo);
+                    this.voice('triangle', f, t, bdur, 0.17 * lv.bass, 600, 0.02, 0.15);
+                    if (tier >= 4) this.voice('sawtooth', f, t, bdur, 0.045 * lv.bass, 420, 0.01, 0.1);
+                }
+
+                // ARPEJO: notas suaves com eco; toca mais vezes a cada faixa
+                const every = this.ARP_EVERY[tier];
+                if (lv.arp > 0.03 && i % every === 0) {
+                    const idx = this.ARP_SEQ[(i / every) % this.ARP_SEQ.length];
+                    const note = idx < 3 ? chord.tones[idx] + 12 : chord.tones[0] + 24;
+                    const v = 0.05 * lv.arp * (every === 1 ? 0.65 : 1) * (i % 4 === 0 ? 1.2 : 1);
+                    this.voice('triangle', this.mtof(note), t, sd * Math.max(2, every * 1.6), v, 2200, 0.006, sd * Math.max(1.5, every * 1.2), true);
+                }
+
+                // PERCUSSÃO: entra bem baixinha e só a partir da faixa 2
+                if (lv.kick > 0.03) { if (tier <= 2 ? i % 8 === 0 : i % 4 === 0) this.kick(t, (i % 8 === 0 ? 0.55 : 0.42) * lv.kick); }
+                if (lv.hat > 0.03) { if (i % 4 === 2) this.hat(t, 0.028 * lv.hat); else if (tier >= 5 && i % 2 === 1) this.hat(t, 0.014 * lv.hat); }
+                if (lv.snare > 0.03) {
+                    if (i === 4 || i === 12) this.snare(t, 0.12 * lv.snare);
+                    if (tier >= 6 && (bar === 3 || bar === 7) && (i === 14 || i === 15)) this.snare(t, 0.07 * lv.snare);
+                }
+
+                // TENSÃO: zumbido grave (faixa 4+) e subida de ruído nos 4 últimos compassos do ciclo (faixa 5+)
+                if (lv.drone > 0.03 && i === 0 && bar % 2 === 0) {
+                    const f = this.mtof(chord.bass - 12), d = sd * 32 + 1.5;
+                    this.voice('sine', f, t, d, 0.08 * lv.drone, 0, 1.5, 1.5);
+                    this.voice('sawtooth', f * 1.0595, t, d, 0.016 * lv.drone, 260, 1.5, 1.5);
+                }
+                if (lv.riser > 0.03 && s === 64) this.riser(t, sd * 64, 0.05 * lv.riser);
+            },
+            setup() {
+                const ctx = AudioSys.ctx;
+                if (!this.comp) {
+                    this.comp = ctx.createDynamicsCompressor(); this.comp.threshold.value = -16; this.comp.ratio.value = 4; this.comp.attack.value = 0.005; this.comp.release.value = 0.15; this.comp.connect(ctx.destination);
+                    const len = ctx.sampleRate; this.noise = ctx.createBuffer(1, len, ctx.sampleRate); const d = this.noise.getChannelData(0); for (let k = 0; k < len; k++) d[k] = Math.random() * 2 - 1;
+                }
+                this.bus = ctx.createGain(); this.bus.gain.value = this.muted ? 0 : this.VOLUME; this.bus.connect(this.comp);
+                // eco suave para o arpejo (dá espaço sem encher de notas)
+                this.echoIn = ctx.createGain(); this.echoIn.gain.value = 0.5;
+                this.echo = ctx.createDelay(2); this.echo.delayTime.value = 0.4;
+                const fb = ctx.createGain(); fb.gain.value = 0.36;
+                const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800;
+                this.echoIn.connect(this.echo); this.echo.connect(lp); lp.connect(fb); fb.connect(this.echo); lp.connect(this.bus);
+                this.nodes = [this.bus, this.echoIn, this.echo, fb, lp];
+            },
+            start() {
+                if (this.playing) return;
+                try { AudioSys.init(); this.setup(); } catch (e) { return; }
+                this.playing = true; this.step = 0; this.tier = 0; this.targetTier = 0; this.bpm = this.TIERS[0].bpm; this.resetLayers();
+                this.nextTime = AudioSys.ctx.currentTime + 0.08; clearInterval(this.timer); this.timer = setInterval(() => this.tick(), 25); this.tick();
+            },
+            tick() {
+                const ctx = AudioSys.ctx; if (!ctx || !this.playing) return;
+                if (this.nextTime < ctx.currentTime - 0.05) this.nextTime = ctx.currentTime + 0.05;
+                while (this.nextTime < ctx.currentTime + 0.12) { try { this.playStep(this.step % 128, this.nextTime); } catch (e) {} this.nextTime += 60 / this.bpm / 4; this.step++; }
+            },
+            stop() {
+                if (!this.playing) return; this.playing = false; clearInterval(this.timer); this.timer = null;
+                const bus = this.bus, nodes = this.nodes, ctx = AudioSys.ctx;
+                if (bus && ctx) { const t = ctx.currentTime; bus.gain.cancelScheduledValues(t); bus.gain.setValueAtTime(bus.gain.value, t); bus.gain.linearRampToValueAtTime(0, t + 0.4); setTimeout(() => { nodes.forEach(n => { try { n.disconnect(); } catch (e) {} }); }, 700); }
+            },
+            // a cada 10 níveis sobe uma faixa de tensão (nível 1-10 = faixa 0, 11-20 = faixa 1, ...)
+            setLevel(lvl) { this.targetTier = Math.min(this.TIERS.length - 1, Math.max(0, Math.floor((lvl - 1) / 10))); },
             setMuted(m) { this.muted = m; try { localStorage.setItem('speedangloMusicMuted', m ? '1' : '0'); } catch (e) {} if (this.bus && AudioSys.ctx) this.bus.gain.setTargetAtTime(m ? 0 : this.VOLUME, AudioSys.ctx.currentTime, 0.04); this.updateButton(); },
             updateButton() { const b = document.getElementById('music-toggle-btn'); if (!b) return; b.textContent = this.muted ? '🔇' : '🎵'; b.classList.toggle('muted', this.muted); }
         };
@@ -524,10 +728,10 @@
             if (!sb) return;
             try {
                 if (mode === '60s') {
-                    const { data } = await sb.from('ranking_60s').select('nome, score').order('score', { ascending: false }).limit(30);
+                    const { data } = await sb.from('ranking_60s').select('nome, score').order('score', { ascending: false }).limit(RANKING_LIMIT);
                     if (data) state.currentLeaderboard = data;
                 } else {
-                    const { data } = await sb.from('ranking').select('nome, level').eq('modo', mode).order('level', { ascending: false }).limit(30);
+                    const { data } = await sb.from('ranking').select('nome, level').eq('modo', mode).order('level', { ascending: false }).limit(RANKING_LIMIT);
                     if (data) state.currentLeaderboard = data;
                 }
             } catch (e) { console.error("Erro ao buscar alvos:", e); }
@@ -535,7 +739,7 @@
 
         const TIME_QUESTION = 15, TIME_SPRINT = 60; // segundos: por pergunta (teclado/múltipla) e duração do modo sprint
         function startMode(mode) {
-            state.currentMode = mode; state.isPlaying = true; state.level = 1; state.score = 0; state.streak = 0; state.lastFrameTime = 0;
+            unlockPlayAgain(); state.currentMode = mode; state.isPlaying = true; state.level = 1; state.score = 0; state.streak = 0; state.lastFrameTime = 0;
             if (mode === '60s') { state.totalTimerLimit = TIME_SPRINT; state.questionTime = TIME_SPRINT; } else { state.totalTimerLimit = TIME_QUESTION; state.questionTime = TIME_QUESTION; }
             state.deadline = Date.now() + state.questionTime * 1000; // prazo em horário real (continua contando mesmo com o PC suspenso)
             const useNativeKb = IS_TOUCH && mode !== 'multipla';
@@ -605,13 +809,14 @@
         function inputDel() { state.currentInput = state.currentInput.slice(0, -1); updateDisplay(); }
 
         window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !document.getElementById('rules-overlay').classList.contains('hidden')) { closeRankingRules(); return; }
             if ((e.key === 'm' || e.key === 'M') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && e.target.tagName !== 'INPUT') toggleMusic();
             if ((e.key === 'f' || e.key === 'F') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && e.target.tagName !== 'INPUT') { toggleFullscreen(); closeFullscreenModal(); }
             state.typedKeysBuffer += e.key.toLowerCase(); if (state.typedKeysBuffer.length > 10) { state.typedKeysBuffer = state.typedKeysBuffer.slice(-10); }
             if (state.typedKeysBuffer.endsWith('hack')) { state.cheatMode = false; updateCheatVisibility(); AudioSys.record(); }
             const gameOverScreen = document.getElementById('game-over-screen');
             if (gameOverScreen && gameOverScreen.classList.contains('active-screen')) {
-                if (e.key === 'Enter') { const nameInput = document.getElementById('player-name'); const rankingSection = document.getElementById('ranking-input-section'); if (document.activeElement === nameInput && rankingSection && rankingSection.style.display !== 'none') { submitRankingName(); } else { startMode(state.currentMode); } return; }
+                if (e.key === 'Enter') { const nameInput = document.getElementById('player-name'); const rankingSection = document.getElementById('ranking-input-section'); if (document.activeElement === nameInput && rankingSection && rankingSection.style.display !== 'none') { submitRankingName(); } else { playAgain(); } return; }
             }
             if (!state.isPlaying) return;
             if (state.cheatMode && e.key.toLowerCase() === 'h') { autoSolve(); return; }
@@ -639,7 +844,7 @@
             if (target) {
                 let diff = (state.currentMode === '60s' ? target.score : target.level) - metric;
                 let unit = state.currentMode === '60s' ? 'pts' : (diff === 1 ? 'nível' : 'níveis');
-                el.innerHTML = `🎯 Faltam <b>${diff} ${unit}</b> para passar "<b>${target.nome}</b>"`;
+                el.innerHTML = `🎯 Faltam <b>${diff} ${unit}</b> para passar "<b>${escapeHtml(target.nome)}</b>"`;
                 el.style.display = 'block';
             } else {
                 el.innerHTML = `👑 <b>Você está em 1º lugar agora!</b>`;
@@ -673,61 +878,48 @@
             state.isPlaying = false; blurNativeInput(); MusicSys.stop(); AudioSys.gameOver();
             document.getElementById('label-final-level').textContent = state.currentMode === '60s' ? "ACERTOS" : "SEU LEVEL"; document.getElementById('final-level').textContent = state.currentMode === '60s' ? state.level - 1 : state.level; document.getElementById('final-score').textContent = state.score; document.getElementById('final-equation').textContent = `${state.currentQuestion.text} = ${String(state.currentQuestion.answer).replace('.', ',')}`;
             
-            const isRankingEligible = (state.currentMode === '60s' && state.score > 800) || (state.currentMode !== '60s' && state.level > 10);
+            const isRankingEligible = qualifiesForRanking();
             const rs = document.getElementById('ranking-input-section');
-            if (isRankingEligible) { rs.style.display = 'block'; document.getElementById('player-name').value = ''; document.getElementById('btn-save-ranking').disabled = false; document.getElementById('btn-save-ranking').textContent = 'SALVAR NO RANKING'; document.getElementById('ranking-msg').style.display = 'none'; } else { rs.style.display = 'none'; }
+            if (isRankingEligible) { rs.style.display = 'block'; document.getElementById('player-name').value = ''; document.getElementById('player-name').classList.remove('name-error'); document.getElementById('btn-save-ranking').disabled = false; document.getElementById('btn-save-ranking').textContent = 'SALVAR NO RANKING'; document.getElementById('ranking-msg').style.display = 'none'; } else { rs.style.display = 'none'; }
             showScreen('game-over-screen');
+            if (state.level > PLAY_AGAIN_FROM_LEVEL) lockPlayAgain(PLAY_AGAIN_WAIT); else unlockPlayAgain();
         }
 
         function saveLocalRecord(name, level_or_score, mode) {
             let arr = mode === 'multipla' ? 'rankingMultipla' : mode === '60s' ? 'ranking60s' : 'rankingTeclado';
             const cleanName = name.trim(); const idx = localRecords[arr].findIndex(i => (i.name || i.nome).toLowerCase() === cleanName.toLowerCase());
             if (idx !== -1) { if (mode === '60s' && level_or_score > localRecords[arr][idx].score) localRecords[arr][idx].score = level_or_score; else if (mode !== '60s' && level_or_score > localRecords[arr][idx].level) localRecords[arr][idx].level = level_or_score; } else { if (mode === '60s') localRecords[arr].push({ name: cleanName, score: level_or_score }); else localRecords[arr].push({ name: cleanName, level: level_or_score }); }
-            localRecords[arr].sort((a, b) => mode === '60s' ? b.score - a.score : b.level - a.level); localStorage.setItem('speedangloRecordsV1', JSON.stringify(localRecords));
+            localRecords[arr].sort((a, b) => mode === '60s' ? b.score - a.score : b.level - a.level); localRecords[arr] = localRecords[arr].slice(0, RANKING_LIMIT); localStorage.setItem('speedangloRecordsV1', JSON.stringify(localRecords));
         }
 
         async function submitRankingName() {
-            let rawName = document.getElementById('player-name').value.trim();
-            
-            if (rawName === '') {
-                rawName = 'Anônimo #' + Math.floor(1000 + Math.random() * 9000);
-            }
+            const input = document.getElementById('player-name'); const btn = document.getElementById('btn-save-ranking'); const msg = document.getElementById('ranking-msg');
+            const name = input.value.replace(/\s+/g, ' ').trim().slice(0, 12);
+            const showMsg = (text, color) => { msg.style.display = 'block'; msg.style.color = color; msg.textContent = text; };
 
-            const btn = document.getElementById('btn-save-ranking'); const msg = document.getElementById('ranking-msg');
-            btn.disabled = true; btn.textContent = 'Salvando...'; msg.style.display = 'block'; msg.style.color = 'var(--primary)'; msg.textContent = 'Enviando...';
+            // o nome é obrigatório: sem nome não salva
+            if (name === '') {
+                input.classList.remove('name-error'); void input.offsetWidth; input.classList.add('name-error');
+                showMsg('⚠️ Digite um nome para entrar no ranking.', 'var(--wrong)'); input.focus(); return;
+            }
+            input.value = name; input.classList.remove('name-error');
+            btn.disabled = true; btn.textContent = 'Salvando...'; showMsg('Enviando...', 'var(--primary)');
 
             const metric = state.currentMode === '60s' ? state.score : state.level;
-            saveLocalRecord(rawName, metric, state.currentMode);
+            saveLocalRecord(name, metric, state.currentMode);
 
             const sb = getSupabase();
             if (sb) {
                 try {
-                    let err = null;
-                    if (state.currentMode === '60s') {
-                        const { error } = await sb.rpc('salvar_maior_score_60s', { p_nome: rawName, p_score: state.score }); err = error;
-                    } else {
-                        const { error } = await sb.rpc('salvar_maior_score', { p_nome: rawName, p_score: state.level, p_modo: state.currentMode }); err = error;
-                    }
-
-                    // FALLBACK: Usar upsert direto caso a função RPC por algum motivo falhe
-                    if (err) {
-                        console.warn("RPC falhou, executando upsert...", err);
-                        if (state.currentMode === '60s') {
-                            const { data: existing } = await sb.from('ranking_60s').select('score').eq('nome', rawName).maybeSingle();
-                            if (!existing || state.score > existing.score) {
-                                await sb.from('ranking_60s').upsert({ nome: rawName, score: state.score }, { onConflict: 'nome' });
-                            }
-                        } else {
-                            const { data: existing } = await sb.from('ranking').select('level').eq('nome', rawName).eq('modo', state.currentMode).maybeSingle();
-                            if (!existing || state.level > existing.level) {
-                                await sb.from('ranking').upsert({ nome: rawName, level: state.level, modo: state.currentMode }, { onConflict: 'nome,modo' });
-                            }
-                        }
-                    }
-
+                    const { error } = state.currentMode === '60s'
+                        ? await sb.rpc('salvar_maior_score_60s', { p_nome: name, p_score: state.score })
+                        : await sb.rpc('salvar_maior_score', { p_nome: name, p_score: state.level, p_modo: state.currentMode });
+                    if (error) throw error;
                     AudioSys.record();
-                } catch (e) { 
-                    console.error("Erro Supabase:", e); 
+                } catch (e) {
+                    console.error("Erro Supabase:", e);
+                    btn.disabled = false; btn.textContent = 'TENTAR DE NOVO'; showMsg('⚠️ Não foi possível salvar agora. Tente de novo.', 'var(--wrong)');
+                    return;
                 }
             }
             document.getElementById('ranking-input-section').style.display = 'none'; openRankingScreen(state.currentMode);
@@ -741,8 +933,8 @@
             if (sb) {
                 try {
                     let data, error;
-                    if (targetTab === '60s') { const res = await sb.from('ranking_60s').select('nome, score').order('score', { ascending: false }).limit(30); data = res.data; error = res.error;
-                    } else { const res = await sb.from('ranking').select('nome, level').eq('modo', targetTab).order('level', { ascending: false }).limit(30); data = res.data; error = res.error; }
+                    if (targetTab === '60s') { const res = await sb.from('ranking_60s').select('nome, score').order('score', { ascending: false }).limit(RANKING_LIMIT); data = res.data; error = res.error;
+                    } else { const res = await sb.from('ranking').select('nome, level').eq('modo', targetTab).order('level', { ascending: false }).limit(RANKING_LIMIT); data = res.data; error = res.error; }
                     if (!error && data) { renderHTMLList(data, listEl, false, targetTab); return; }
                 } catch (e) { console.error("Erro busca Supabase:", e); }
             }
@@ -752,13 +944,14 @@
         function renderHTMLList(data, listEl, isLocal = false, mode) {
             listEl.innerHTML = '';
             if (!data || data.length === 0) { listEl.innerHTML = `<div style="text-align:center; padding: 30px; color: var(--subtitle-color); font-style: italic;">Nenhum registro encontrado ainda.<br><br>Seja o primeiro!</div>`; return; }
-            if (isLocal) listEl.innerHTML = `<div style="text-align:center; padding: 5px; font-size: 0.8rem; color: var(--subtitle-color);">Exibindo Ranking Local</div>`;
-            data.forEach((entry, idx) => {
+            let html = isLocal ? `<div style="text-align:center; padding: 5px; font-size: 0.8rem; color: var(--subtitle-color);">Exibindo Ranking Local</div>` : '';
+            data.slice(0, RANKING_LIMIT).forEach((entry, idx) => {
                 let rankClass = ''; let icon = `#${idx + 1}`;
                 if (idx === 0) { rankClass = 'rank-1'; icon = '👑'; } else if (idx === 1) { rankClass = 'rank-2'; icon = '🥈'; } else if (idx === 2) { rankClass = 'rank-3'; icon = '🥉'; }
-                let metricText = mode === '60s' ? `⭐ ${entry.score}` : `Lvl ${entry.level}`;
-                listEl.innerHTML += `<div class="ranking-item ${rankClass}" style="animation-delay:${Math.min(idx, 10) * 35}ms"><div class="rank-pos">${icon}</div><div class="rank-name">${entry.nome || entry.name}</div><div class="rank-lvl">${metricText}</div></div>`;
+                let metricText = mode === '60s' ? `⭐ ${escapeHtml(entry.score)}` : `Lvl ${escapeHtml(entry.level)}`;
+                html += `<div class="ranking-item ${rankClass}" style="animation-delay:${Math.min(idx, 10) * 35}ms"><div class="rank-pos">${icon}</div><div class="rank-name">${escapeHtml(entry.nome || entry.name)}</div><div class="rank-lvl">${metricText}</div></div>`;
             });
+            listEl.innerHTML = html;
         }
 
         window.onload = () => {
@@ -767,6 +960,7 @@
             try { MusicSys.muted = localStorage.getItem('speedangloMusicMuted') === '1'; } catch (e) {} MusicSys.updateButton();
             if (localStorage.getItem('speedangloTheme') === 'light') { document.body.classList.add('light-mode'); document.getElementById('theme-toggle-btn').textContent = '🌙'; }
             updateFullscreenButton();
+            document.getElementById('player-name').addEventListener('input', (ev) => { ev.target.classList.remove('name-error'); document.getElementById('ranking-msg').style.display = 'none'; });
         };
     </script>
 </body>
